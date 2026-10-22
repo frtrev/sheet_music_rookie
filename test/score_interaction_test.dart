@@ -55,6 +55,32 @@ void main() {
     expect(ScoreLayout.scoreEndTick(composition), 2400);
   });
 
+  test('score scrolling reveals cursor movement forward and backward', () {
+    final forward = ScoreLayout.scrollOffsetToRevealCursor(
+      cursorX: 700,
+      currentOffset: 0,
+      viewportWidth: 320,
+      maxScrollExtent: 600,
+    );
+    expect(forward, 424);
+
+    final alreadyVisible = ScoreLayout.scrollOffsetToRevealCursor(
+      cursorX: 700,
+      currentOffset: forward!,
+      viewportWidth: 320,
+      maxScrollExtent: 600,
+    );
+    expect(alreadyVisible, isNull);
+
+    final backward = ScoreLayout.scrollOffsetToRevealCursor(
+      cursorX: 126,
+      currentOffset: forward,
+      viewportWidth: 320,
+      maxScrollExtent: 600,
+    );
+    expect(backward, 98);
+  });
+
   test('flat and sharp spellings use the correct staff position', () {
     final cSharp = ScoreLayout.staffStep(
       ClefType.treble,

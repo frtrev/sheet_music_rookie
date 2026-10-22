@@ -123,6 +123,27 @@ class ScoreLayout {
         start +
         usable * localTick / capacity;
   }
+
+  static double? scrollOffsetToRevealCursor({
+    required double cursorX,
+    required double currentOffset,
+    required double viewportWidth,
+    required double maxScrollExtent,
+    double leftMargin = 28,
+    double rightMargin = 44,
+  }) {
+    final leftEdge = currentOffset + leftMargin;
+    final rightEdge = currentOffset + viewportWidth - rightMargin;
+    if (cursorX > rightEdge) {
+      return (cursorX - viewportWidth + rightMargin)
+          .clamp(0.0, maxScrollExtent)
+          .toDouble();
+    }
+    if (cursorX < leftEdge) {
+      return (cursorX - leftMargin).clamp(0.0, maxScrollExtent).toDouble();
+    }
+    return null;
+  }
 }
 
 class ScoreView extends StatelessWidget {

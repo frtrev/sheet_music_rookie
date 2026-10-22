@@ -38,7 +38,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   bool _pausedByUser = false;
   bool _settingsExpanded = false;
   bool _resumeListeningAfterPlayback = false;
-  int _measureCount = 1;
+  bool _cursorScrollScheduled = false;
 
   @override
   void initState() {
@@ -53,6 +53,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _metronome = MetronomeService();
     _playback.position.addListener(_playbackPositionChanged);
     _engine.composition.addListener(_compositionChanged);
+    _engine.notationCursorTick.addListener(_notationCursorChanged);
     _engine.microphoneStatus.addListener(_microphoneStatusChanged);
     unawaited(_engine.initialize());
   }
@@ -66,19 +67,33 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   void _compositionChanged() {
-    final nextCount = _engine.composition.value.measures.length;
-    if (nextCount > _measureCount) {
-      _measureCount = nextCount;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scoreScroll.hasClients) {
-          _scoreScroll.animateTo(
-            _scoreScroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-    }
+    _scheduleCursorScroll();
+  }
+
+  void _notationCursorChanged() => _scheduleCursorScroll();
+
+  void _scheduleCursorScroll() {
+    if (_cursorScrollScheduled) return;
+    _cursorScrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _cursorScrollScheduled = false;
+      if (!mounted || !_scoreScroll.hasClients) return;
+      final composition = _engine.composition.value;
+      final cursorX = ScoreLayout.cursorX(
+        composition,
+        _engine.notationCursorTick.value,
+      );
+      final position = _scoreScroll.position;
+      final target = ScoreLayout.scrollOffsetToRevealCursor(
+        cursorX: cursorX,
+        currentOffset: position.pixels,
+        viewportWidth: position.viewportDimension,
+        maxScrollExtent: position.maxScrollExtent,
+      );
+      if (target != null) {
+        _scoreScroll.jumpTo(target);
+      }
+    });
   }
 
   void _playbackPositionChanged() {
@@ -94,20 +109,6 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       0,
       ScoreLayout.scoreEndTick(composition),
     );
-    if (!_scoreScroll.hasClients) return;
-    final cursorX = ScoreLayout.cursorX(composition, ticks);
-    final position = _scoreScroll.position;
-    final rightEdge = position.pixels + position.viewportDimension - 44;
-    if (cursorX > rightEdge) {
-      _scoreScroll.jumpTo(
-        (cursorX - position.viewportDimension + 70).clamp(
-          0,
-          position.maxScrollExtent,
-        ),
-      );
-    } else if (cursorX < position.pixels + 28) {
-      _scoreScroll.jumpTo((cursorX - 28).clamp(0, position.maxScrollExtent));
-    }
   }
 
   @override
@@ -828,6 +829,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _engine.composition.removeListener(_compositionChanged);
+    _engine.notationCursorTick.removeListener(_notationCursorChanged);
     _engine.microphoneStatus.removeListener(_microphoneStatusChanged);
     _playback.position.removeListener(_playbackPositionChanged);
     _scoreScroll.dispose();
