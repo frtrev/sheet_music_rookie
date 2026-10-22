@@ -1,0 +1,861 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../audio/microphone_service.dart';
+import '../models/composition.dart';
+import '../models/measure.dart';
+import '../models/musical_note.dart';
+import '../notation/rest_symbol.dart';
+import '../notation/score_renderer.dart';
+import '../services/metronome_service.dart';
+import '../services/score_playback_service.dart';
+import '../transcription/transcription_engine.dart';
+import '../widgets/live_pitch_monitor.dart';
+import '../widgets/voice_settings_panel.dart';
+
+class ScoreEditorScreen extends StatefulWidget {
+  const ScoreEditorScreen({
+    super.key,
+    required this.clef,
+    required this.octaveRange,
+  });
+  final ClefType clef;
+  final OctaveRange octaveRange;
+
+  @override
+  State<ScoreEditorScreen> createState() => _ScoreEditorScreenState();
+}
+
+class _ScoreEditorScreenState extends State<ScoreEditorScreen>
+    with WidgetsBindingObserver {
+  late final TranscriptionEngine _engine;
+  late final ScorePlaybackService _playback;
+  late final ScorePlaybackService _notePreview;
+  late final MetronomeService _metronome;
+  final ScrollController _scoreScroll = ScrollController();
+  final ScrollController _pageScroll = ScrollController();
+  bool _pausedByUser = false;
+  bool _settingsExpanded = false;
+  bool _resumeListeningAfterPlayback = false;
+  int _measureCount = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _engine = TranscriptionEngine(
+      clef: widget.clef,
+      octaveRange: widget.octaveRange,
+    );
+    _playback = ScorePlaybackService()..onComplete = _playbackCompleted;
+    _notePreview = ScorePlaybackService();
+    _metronome = MetronomeService();
+    _playback.position.addListener(_playbackPositionChanged);
+    _engine.composition.addListener(_compositionChanged);
+    _engine.microphoneStatus.addListener(_microphoneStatusChanged);
+    unawaited(_engine.initialize());
+  }
+
+  void _microphoneStatusChanged() {
+    final status = _engine.microphoneStatus.value;
+    if (status == MicrophoneStatus.paused ||
+        status == MicrophoneStatus.unavailable) {
+      unawaited(_metronome.stop());
+    }
+  }
+
+  void _compositionChanged() {
+    final nextCount = _engine.composition.value.measures.length;
+    if (nextCount > _measureCount) {
+      _measureCount = nextCount;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scoreScroll.hasClients) {
+          _scoreScroll.animateTo(
+            _scoreScroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  void _playbackPositionChanged() {
+    // Seeking while stopped is coordinated explicitly by the score cursor.
+    // Ignore native stop/reset events so they cannot jump the selection to 0.
+    if (!_playback.isPlaying.value) return;
+    final composition = _engine.composition.value;
+    final ticks = ScoreLayout.ticksAt(
+      _playback.position.value,
+      composition.tempoBpm,
+    );
+    _engine.notationCursorTick.value = ticks.clamp(
+      0,
+      ScoreLayout.scoreEndTick(composition),
+    );
+    if (!_scoreScroll.hasClients) return;
+    final cursorX = ScoreLayout.cursorX(composition, ticks);
+    final position = _scoreScroll.position;
+    final rightEdge = position.pixels + position.viewportDimension - 44;
+    if (cursorX > rightEdge) {
+      _scoreScroll.jumpTo(
+        (cursorX - position.viewportDimension + 70).clamp(
+          0,
+          position.maxScrollExtent,
+        ),
+      );
+    } else if (cursorX < position.pixels + 28) {
+      _scoreScroll.jumpTo((cursorX - 28).clamp(0, position.maxScrollExtent));
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      unawaited(_stopPlayback(resumeListening: false));
+      unawaited(_pauseRecording());
+    } else if (state == AppLifecycleState.resumed && !_pausedByUser) {
+      unawaited(_startRecordingAtCursor());
+    }
+  }
+
+  Future<void> _leave() async {
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false, resetCursor: true);
+    await _pauseRecording();
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> _clear() async {
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false, resetCursor: true);
+    if (!mounted) return;
+    if (_engine.rawEvents.isNotEmpty) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Clear the sheet?'),
+          content: const Text(
+            'All transcribed notes in this composition will be removed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Clear'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    _engine.clear();
+    await _playback.seek(Duration.zero);
+    if (_scoreScroll.hasClients) _scoreScroll.jumpTo(0);
+  }
+
+  Future<void> _togglePlayback() async {
+    await _notePreview.stop(resetPosition: true);
+    if (!mounted) return;
+    if (_playback.isPlaying.value) {
+      await _stopPlayback(resumeListening: true);
+      return;
+    }
+    final hasNotes = _engine.composition.value.measures.any(
+      (measure) => measure.notes.isNotEmpty,
+    );
+    if (!hasNotes) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sing a few notes before playing the score.'),
+        ),
+      );
+      return;
+    }
+
+    final status = _engine.microphoneStatus.value;
+    _resumeListeningAfterPlayback =
+        !_pausedByUser &&
+        status != MicrophoneStatus.unavailable &&
+        status != MicrophoneStatus.paused;
+    await _pauseRecording();
+    final composition = _engine.composition.value;
+    final endTick = ScoreLayout.scoreEndTick(composition);
+    var startTick = _engine.notationCursorTick.value;
+    if (startTick >= endTick) {
+      startTick = 0;
+      _engine.notationCursorTick.value = 0;
+    }
+    final startAt = ScoreLayout.durationAt(startTick, composition.tempoBpm);
+    if (_playback.position.value != startAt) {
+      await _playback.seek(startAt);
+    }
+    final started = await _playback.play(composition, startAt: startAt);
+    if (!started) await _resumeAfterPlaybackIfNeeded();
+  }
+
+  Future<void> _movePlaybackCursor(Duration position) async {
+    await _notePreview.stop(resetPosition: true);
+    if (!_playback.isPlaying.value &&
+        _engine.microphoneStatus.value != MicrophoneStatus.paused &&
+        _engine.microphoneStatus.value != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = ScoreLayout.ticksAt(
+      position,
+      _engine.composition.value.tempoBpm,
+    );
+    await _playback.seek(position);
+  }
+
+  Future<void> _startRecordingAtCursor() async {
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    _engine.beginPunchInAt(_engine.notationCursorTick.value);
+    _pausedByUser = false;
+    await _engine.startListening();
+    await _syncMetronome();
+  }
+
+  Future<void> _showNoteMenu() async {
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    if (!mounted) return;
+
+    const pitchNames = [
+      'C',
+      'C♯',
+      'D',
+      'D♯',
+      'E',
+      'F',
+      'F♯',
+      'G',
+      'G♯',
+      'A',
+      'A♯',
+      'B',
+    ];
+    var pitchClass = 0;
+    var octave = 4;
+    var noteValue = NoteValue.quarter;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              20,
+              20,
+              20 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Insert note at cursor',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: pitchClass,
+                        decoration: const InputDecoration(labelText: 'Pitch'),
+                        items: [
+                          for (
+                            var index = 0;
+                            index < pitchNames.length;
+                            index++
+                          )
+                            DropdownMenuItem(
+                              value: index,
+                              child: Text(pitchNames[index]),
+                            ),
+                        ],
+                        onChanged: (value) => setSheetState(
+                          () => pitchClass = value ?? pitchClass,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: octave,
+                        decoration: const InputDecoration(labelText: 'Octave'),
+                        items: [
+                          for (var value = 1; value <= 7; value++)
+                            DropdownMenuItem(
+                              value: value,
+                              child: Text('$value'),
+                            ),
+                        ],
+                        onChanged: (value) =>
+                            setSheetState(() => octave = value ?? octave),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<NoteValue>(
+                  initialValue: noteValue,
+                  decoration: const InputDecoration(labelText: 'Duration'),
+                  items: [
+                    for (final value in NoteValue.values)
+                      DropdownMenuItem(value: value, child: Text(value.label)),
+                  ],
+                  onChanged: (value) =>
+                      setSheetState(() => noteValue = value ?? noteValue),
+                ),
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () {
+                    final midi = (octave + 1) * 12 + pitchClass;
+                    _engine.insertManualNote(
+                      _engine.notationCursorTick.value,
+                      midi,
+                      noteValue,
+                    );
+                    final position = ScoreLayout.durationAt(
+                      _engine.notationCursorTick.value,
+                      _engine.composition.value.tempoBpm,
+                    );
+                    unawaited(_playback.seek(position));
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.add),
+                  label: const Text('Insert note'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pauseRecording() async {
+    await _metronome.stop();
+    await _engine.pauseListening();
+  }
+
+  Future<void> _editSelectedNote({
+    int pitchDelta = 0,
+    int durationDelta = 0,
+  }) async {
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = selectedTick;
+    final edited = _engine.editNoteAtTick(
+      selectedTick,
+      pitchDelta: pitchDelta,
+      durationDelta: durationDelta,
+    );
+    if (edited == null) return;
+    _engine.notationCursorTick.value = selectedTick;
+
+    await _playEditedPreview(
+      midiPitch: edited.midiPitch,
+      durationTicks: edited.durationTicks,
+      isRest: _engine.isRestAtTick(selectedTick),
+    );
+  }
+
+  Future<void> _toggleSelectedRest() async {
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = selectedTick;
+    final edited = _engine.toggleRestAtTick(selectedTick);
+    if (edited == null) return;
+    _engine.notationCursorTick.value = selectedTick;
+    await _playEditedPreview(
+      midiPitch: edited.midiPitch,
+      durationTicks: edited.durationTicks,
+      isRest: edited.isRest,
+    );
+  }
+
+  Future<void> _toggleSelectedTie() async {
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = selectedTick;
+    _engine.toggleTieAtTick(selectedTick);
+    _engine.notationCursorTick.value = selectedTick;
+  }
+
+  Future<void> _playEditedPreview({
+    required int midiPitch,
+    required int durationTicks,
+    required bool isRest,
+  }) async {
+    final composition = _engine.composition.value;
+    await _notePreview.play(
+      Composition(
+        clef: composition.clef,
+        tempoBpm: composition.tempoBpm,
+        measures: [
+          Measure(
+            index: 0,
+            notes: [
+              MusicalNote(
+                midiPitch: midiPitch,
+                startTick: 0,
+                durationTicks: durationTicks,
+                isRest: isRest,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleMetronome(bool enabled) async {
+    _engine.setMetronomeEnabled(enabled);
+    await _syncMetronome();
+  }
+
+  Future<void> _syncMetronome() async {
+    final composition = _engine.composition.value;
+    final status = _engine.microphoneStatus.value;
+    final recording =
+        status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable &&
+        status != MicrophoneStatus.starting;
+    if (!composition.metronomeEnabled ||
+        !recording ||
+        _playback.isPlaying.value) {
+      await _metronome.stop();
+      return;
+    }
+    try {
+      await _metronome.start(composition.tempoBpm);
+    } catch (_) {
+      _engine.setMetronomeEnabled(false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The metronome could not start.')),
+        );
+      }
+    }
+  }
+
+  void _playbackCompleted() {
+    _engine.notationCursorTick.value = ScoreLayout.scoreEndTick(
+      _engine.composition.value,
+    );
+    unawaited(_resumeAfterPlaybackIfNeeded());
+  }
+
+  Future<void> _stopPlayback({
+    required bool resumeListening,
+    bool resetCursor = false,
+  }) async {
+    final shouldResume = resumeListening && _resumeListeningAfterPlayback;
+    _resumeListeningAfterPlayback = false;
+    await _playback.stop(resetPosition: resetCursor);
+    if (shouldResume && mounted) await _startRecordingAtCursor();
+  }
+
+  Future<void> _resumeAfterPlaybackIfNeeded() async {
+    final shouldResume = _resumeListeningAfterPlayback;
+    _resumeListeningAfterPlayback = false;
+    if (shouldResume && mounted) await _startRecordingAtCursor();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) unawaited(_leave());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            onPressed: _leave,
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Back',
+          ),
+          title: const Text('Untitled Composition'),
+          actions: [
+            ValueListenableBuilder<bool>(
+              valueListenable: _playback.isPlaying,
+              builder: (context, playing, _) => IconButton(
+                tooltip: playing ? 'Stop Playback' : 'Play Score',
+                icon: Icon(
+                  playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                ),
+                onPressed: _togglePlayback,
+              ),
+            ),
+            ValueListenableBuilder<MicrophoneStatus>(
+              valueListenable: _engine.microphoneStatus,
+              builder: (context, status, _) {
+                final paused = status == MicrophoneStatus.paused;
+                return IconButton(
+                  tooltip: paused ? 'Resume Listening' : 'Pause Listening',
+                  icon: Icon(paused ? Icons.mic : Icons.mic_off),
+                  onPressed: () {
+                    if (_playback.isPlaying.value) return;
+                    if (paused) {
+                      unawaited(_startRecordingAtCursor());
+                    } else {
+                      _pausedByUser = true;
+                      unawaited(_pauseRecording());
+                    }
+                  },
+                );
+              },
+            ),
+            IconButton(
+              onPressed: _showNoteMenu,
+              icon: const Icon(Icons.note_add_outlined),
+              tooltip: 'Insert Note',
+            ),
+            IconButton(
+              onPressed: _clear,
+              icon: const Icon(Icons.delete_sweep_outlined),
+              tooltip: 'Clear Sheet',
+            ),
+            IconButton(
+              onPressed: () {
+                setState(() => _settingsExpanded = !_settingsExpanded);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_pageScroll.hasClients) {
+                    _pageScroll.animateTo(
+                      _pageScroll.position.maxScrollExtent,
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOut,
+                    );
+                  }
+                });
+              },
+              icon: const Icon(Icons.tune),
+              tooltip: 'Voice Settings',
+            ),
+          ],
+        ),
+        body: ListView(
+          controller: _pageScroll,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+          children: [
+            ValueListenableBuilder<Composition>(
+              valueListenable: _engine.composition,
+              builder: (context, composition, _) => _CompositionHeader(
+                composition: composition,
+                onMetronomeChanged: (enabled) =>
+                    unawaited(_toggleMetronome(enabled)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: SizedBox(
+                height: 250,
+                child: ValueListenableBuilder<Composition>(
+                  valueListenable: _engine.composition,
+                  builder: (context, composition, _) =>
+                      ValueListenableBuilder<int>(
+                        valueListenable: _engine.notationCursorTick,
+                        builder: (context, cursorTick, _) => ScoreView(
+                          composition: composition,
+                          scrollController: _scoreScroll,
+                          selectedEventIndex: _engine.eventIndexAtTick(
+                            cursorTick,
+                          ),
+                          playbackPosition: ScoreLayout.durationAt(
+                            cursorTick,
+                            composition.tempoBpm,
+                          ),
+                          showPlaybackCursor: true,
+                          onCursorMoved: (position) =>
+                              unawaited(_movePlaybackCursor(position)),
+                        ),
+                      ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            ValueListenableBuilder<Composition>(
+              valueListenable: _engine.composition,
+              builder: (context, _, _) => ValueListenableBuilder<int>(
+                valueListenable: _engine.notationCursorTick,
+                builder: (context, cursorTick, _) => _NoteEditControls(
+                  hasEvent: _engine.eventIndexAtTick(cursorTick) != null,
+                  isRest: _engine.isRestAtTick(cursorTick),
+                  canToggleRest: _engine.canToggleRestAtTick(cursorTick),
+                  canToggleTie: _engine.canToggleTieAtTick(cursorTick),
+                  isTied: _engine.isTiedAtTick(cursorTick),
+                  onPitchUp: () => unawaited(_editSelectedNote(pitchDelta: 1)),
+                  onPitchDown: () =>
+                      unawaited(_editSelectedNote(pitchDelta: -1)),
+                  onShorter: () =>
+                      unawaited(_editSelectedNote(durationDelta: -1)),
+                  onLonger: () =>
+                      unawaited(_editSelectedNote(durationDelta: 1)),
+                  onToggleRest: () => unawaited(_toggleSelectedRest()),
+                  onToggleTie: () => unawaited(_toggleSelectedTie()),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                'Tap anywhere on the staff to place the cursor. Play and Record start there; recording overwrites until you pause singing.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.black54),
+              ),
+            ),
+            const SizedBox(height: 10),
+            LivePitchMonitor(
+              status: _engine.microphoneStatus,
+              pitch: _engine.livePitch,
+              durationMs: _engine.currentNoteDurationMs,
+            ),
+            const SizedBox(height: 10),
+            ValueListenableBuilder<MicrophoneStatus>(
+              valueListenable: _engine.microphoneStatus,
+              builder: (context, status, _) =>
+                  status == MicrophoneStatus.unavailable
+                  ? Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: ListTile(
+                        leading: const Icon(Icons.mic_off),
+                        title: const Text('Microphone unavailable'),
+                        subtitle: const Text(
+                          'Allow microphone access in system settings, then try again.',
+                        ),
+                        trailing: TextButton(
+                          onPressed: _startRecordingAtCursor,
+                          child: const Text('Retry'),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            Card(
+              child: ExpansionTile(
+                key: ValueKey(_settingsExpanded),
+                initiallyExpanded: _settingsExpanded,
+                onExpansionChanged: (value) => _settingsExpanded = value,
+                leading: const Icon(Icons.graphic_eq),
+                title: const Text('Voice Detection Settings'),
+                subtitle: const Text(
+                  'Changes apply while the microphone is running',
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                children: [
+                  ValueListenableBuilder(
+                    valueListenable: _engine.settings,
+                    builder: (context, value, _) => VoiceSettingsPanel(
+                      value: value,
+                      onChanged: (next) =>
+                          unawaited(_engine.updateSettings(next)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _engine.composition.removeListener(_compositionChanged);
+    _engine.microphoneStatus.removeListener(_microphoneStatusChanged);
+    _playback.position.removeListener(_playbackPositionChanged);
+    _scoreScroll.dispose();
+    _pageScroll.dispose();
+    unawaited(_playback.dispose());
+    unawaited(_notePreview.dispose());
+    unawaited(_metronome.dispose());
+    unawaited(_engine.dispose());
+    super.dispose();
+  }
+}
+
+class _NoteEditControls extends StatelessWidget {
+  const _NoteEditControls({
+    required this.hasEvent,
+    required this.isRest,
+    required this.canToggleRest,
+    required this.canToggleTie,
+    required this.isTied,
+    required this.onPitchUp,
+    required this.onPitchDown,
+    required this.onShorter,
+    required this.onLonger,
+    required this.onToggleRest,
+    required this.onToggleTie,
+  });
+
+  final bool hasEvent;
+  final bool isRest;
+  final bool canToggleRest;
+  final bool canToggleTie;
+  final bool isTied;
+  final VoidCallback onPitchUp;
+  final VoidCallback onPitchDown;
+  final VoidCallback onShorter;
+  final VoidCallback onLonger;
+  final VoidCallback onToggleRest;
+  final VoidCallback onToggleTie;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              hasEvent
+                  ? (isRest ? 'Selected rest' : 'Selected note')
+                  : 'Insert rest',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: hasEvent && !isRest ? onPitchDown : null,
+            icon: const Icon(Icons.arrow_downward),
+            tooltip: 'Down one semitone',
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: hasEvent && !isRest ? onPitchUp : null,
+            icon: const Icon(Icons.arrow_upward),
+            tooltip: 'Up one semitone',
+          ),
+          const SizedBox(height: 28, child: VerticalDivider(width: 12)),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: hasEvent ? onShorter : null,
+            icon: const Icon(Icons.arrow_back),
+            tooltip: 'Shorter note',
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: hasEvent ? onLonger : null,
+            icon: const Icon(Icons.arrow_forward),
+            tooltip: 'Longer note',
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: canToggleRest ? onToggleRest : null,
+            icon: isRest
+                ? const Icon(Icons.music_note)
+                : const RestSymbolIcon(size: 23),
+            tooltip: isRest ? 'Change to first-line note' : 'Change to rest',
+          ),
+          IconButton(
+            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
+            padding: EdgeInsets.zero,
+            onPressed: canToggleTie || isTied ? onToggleTie : null,
+            icon: Icon(isTied ? Icons.link_off : Icons.link),
+            tooltip: isTied ? 'Remove tie' : 'Tie to next note',
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _CompositionHeader extends StatelessWidget {
+  const _CompositionHeader({
+    required this.composition,
+    required this.onMetronomeChanged,
+  });
+  final Composition composition;
+  final ValueChanged<bool> onMetronomeChanged;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+    spacing: 8,
+    runSpacing: 6,
+    children: [
+      _chip(
+        Icons.music_note,
+        composition.clef == ClefType.treble ? 'Treble clef' : 'Bass clef',
+      ),
+      _chip(Icons.swap_vert, composition.octaveRange.label),
+      _chip(Icons.key, composition.keySignature),
+      _chip(
+        Icons.timer_outlined,
+        '${composition.beatsPerMeasure}/${composition.beatUnit}',
+      ),
+      _chip(Icons.speed, '${composition.tempoBpm} BPM'),
+      _chip(
+        Icons.grid_view,
+        '${composition.measures.length} measure${composition.measures.length == 1 ? '' : 's'}',
+      ),
+      _chip(Icons.straighten, 'Fixed tempo'),
+      ActionChip(
+        avatar: Icon(
+          composition.metronomeEnabled ? Icons.music_note : Icons.music_off,
+          size: 16,
+        ),
+        label: Text(
+          composition.metronomeEnabled ? 'Metronome on' : 'Metronome off',
+        ),
+        onPressed: () => onMetronomeChanged(!composition.metronomeEnabled),
+        visualDensity: VisualDensity.compact,
+      ),
+    ],
+  );
+
+  Widget _chip(IconData icon, String label) => Chip(
+    avatar: Icon(icon, size: 16),
+    label: Text(label),
+    visualDensity: VisualDensity.compact,
+  );
+}
