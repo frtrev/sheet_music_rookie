@@ -156,6 +156,7 @@ class TranscriptionEngine {
         composition.value.tempoBpm,
         composition.value.beatsPerMeasure,
         octaveTranspositionSemitones: composition.value.octaveRange.semitones,
+        keySignature: composition.value.keySignature,
       ),
     );
     if (active != null || preview.isNotEmpty) {
@@ -396,10 +397,17 @@ class TranscriptionEngine {
     final groupPitch = rawEvents[groupStart].midiPitch;
     final nextMidi = (groupPitch + pitchDelta).clamp(0, 127).toInt();
     final isBlackKey = const {1, 3, 6, 8, 10}.contains(nextMidi % 12);
+    final writtenPitchClass =
+        (nextMidi - composition.value.octaveRange.semitones) % 12;
     final accidental = pitchDelta == 0
         ? rawEvents[groupStart].accidental
         : isBlackKey
         ? (pitchDelta > 0 ? NoteAccidental.sharp : NoteAccidental.flat)
+        : composition.value.keySignature.alterationForNaturalPitchClass(
+                writtenPitchClass,
+              ) !=
+              0
+        ? NoteAccidental.natural
         : NoteAccidental.automatic;
     final frequency = 440 * math.pow(2, (nextMidi - 69) / 12);
 
@@ -533,6 +541,11 @@ class TranscriptionEngine {
 
   void setMetronomeEnabled(bool enabled) {
     composition.value = composition.value.copyWith(metronomeEnabled: enabled);
+  }
+
+  void setKeySignature(KeySignature keySignature) {
+    composition.value = composition.value.copyWith(keySignature: keySignature);
+    _rebuildComposition();
   }
 
   void clear() {

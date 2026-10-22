@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sheet_music_rookie/models/composition.dart';
 import 'package:sheet_music_rookie/models/musical_note.dart';
 import 'package:sheet_music_rookie/models/raw_note_event.dart';
 import 'package:sheet_music_rookie/transcription/measure_builder.dart';
@@ -56,6 +57,37 @@ void main() {
 
     expect(measures.single.notes.single.midiPitch, 48);
   });
+
+  test('key signature accidentals are implied instead of repeated', () {
+    final gMajor = const MeasureBuilder().build(
+      [event(0, 500, midi: 66)],
+      120,
+      4,
+      keySignature: KeySignature.gMajor,
+    );
+    final fMajor = const MeasureBuilder().build(
+      [event(0, 500, midi: 70)],
+      120,
+      4,
+      keySignature: KeySignature.fMajor,
+    );
+
+    expect(gMajor.single.notes.single.accidental, NoteAccidental.none);
+    expect(gMajor.single.notes.single.flatSpelling, isFalse);
+    expect(fMajor.single.notes.single.accidental, NoteAccidental.none);
+    expect(fMajor.single.notes.single.flatSpelling, isTrue);
+  });
+
+  test(
+    'all standard major key signatures from seven flats to sharps exist',
+    () {
+      expect(KeySignature.values, hasLength(15));
+      expect(
+        KeySignature.values.map((key) => key.accidentalCount).toSet(),
+        equals({for (var count = -7; count <= 7; count++) count}),
+      );
+    },
+  );
 
   test('4/4 bar keeps four visible beats when a note crosses the bar line', () {
     final measures = const MeasureBuilder().build(

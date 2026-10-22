@@ -12,14 +12,17 @@ class ScoreLayout {
   static const staffTop = 96.0;
   static const left = 72.0;
 
-  static double contentStart(int measureIndex) => measureIndex == 0 ? 54 : 14;
+  static double contentStart(Composition composition, int measureIndex) =>
+      measureIndex == 0
+      ? 54 + composition.keySignature.accidentalCount.abs() * 7.5
+      : 14;
 
   static Offset noteCenter(
     Composition composition,
     int measureIndex,
     MusicalNote note,
   ) {
-    final start = contentStart(measureIndex);
+    final start = contentStart(composition, measureIndex);
     final usable = measureWidth - start - 14;
     final x =
         left +
@@ -34,6 +37,7 @@ class ScoreLayout {
                     composition.clef,
                     note.midiPitch,
                     accidental: note.accidental,
+                    flatSpelling: note.flatSpelling,
                   ) *
                   (lineGap / 2);
     return Offset(x, y);
@@ -43,11 +47,12 @@ class ScoreLayout {
     ClefType clef,
     int midi, {
     NoteAccidental accidental = NoteAccidental.automatic,
+    bool flatSpelling = false,
   }) {
     const degreeForPitchClass = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
     final pitchClass = midi % 12;
     final flatAdjustment =
-        accidental == NoteAccidental.flat &&
+        (flatSpelling || accidental == NoteAccidental.flat) &&
             const {1, 3, 6, 8, 10}.contains(pitchClass)
         ? 1
         : 0;
@@ -88,7 +93,7 @@ class ScoreLayout {
     final measureIndex = rawMeasureIndex
         .clamp(0, math.max(0, composition.measures.length - 1))
         .toInt();
-    final start = contentStart(measureIndex);
+    final start = contentStart(composition, measureIndex);
     final usable = measureWidth - start - 14;
     final localX = x - left - measureIndex * measureWidth - start;
     final unsnappedTick = (localX / usable * capacity).round();
@@ -111,7 +116,7 @@ class ScoreLayout {
     final localTick = rawMeasureIndex > maxMeasureIndex
         ? capacity
         : boundedTick % capacity;
-    final start = contentStart(measureIndex);
+    final start = contentStart(composition, measureIndex);
     final usable = measureWidth - start - 14;
     return left +
         measureIndex * measureWidth +
@@ -246,11 +251,12 @@ class ScorePainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      composition.keySignature,
+      composition.keySignature.name,
       const Offset(132, 45),
       13,
       color: const Color(0xff5e625c),
     );
+    _drawKeySignature(canvas);
 
     final selectedSources = _selectedSourceEvents();
     for (final measure in composition.measures) {
@@ -313,6 +319,7 @@ class ScorePainter extends CustomPainter {
       composition.clef,
       note.midiPitch,
       accidental: note.accidental,
+      flatSpelling: note.flatSpelling,
     );
 
     if (selectedSources.contains(note.sourceEventIndex)) {
@@ -395,6 +402,32 @@ class ScorePainter extends CustomPainter {
         ..moveTo(x - 2, y + 12)
         ..quadraticBezierTo(x + 14, y + 22, x + 28, y + 10);
       canvas.drawPath(tie, ink..style = PaintingStyle.stroke);
+    }
+  }
+
+  void _drawKeySignature(Canvas canvas) {
+    final count = composition.keySignature.accidentalCount;
+    if (count == 0) return;
+    const trebleSharps = [8, 5, 9, 6, 3, 7, 4];
+    const bassSharps = [6, 3, 7, 4, 1, 5, 2];
+    const trebleFlats = [4, 7, 3, 6, 2, 5, 1];
+    const bassFlats = [2, 5, 1, 4, 0, 3, -1];
+    final sharps = count > 0;
+    final steps = switch ((composition.clef, sharps)) {
+      (ClefType.treble, true) => trebleSharps,
+      (ClefType.bass, true) => bassSharps,
+      (ClefType.treble, false) => trebleFlats,
+      (ClefType.bass, false) => bassFlats,
+    };
+    final bottom = ScoreLayout.staffTop + 4 * ScoreLayout.lineGap;
+    for (var index = 0; index < count.abs(); index++) {
+      final y = bottom - steps[index] * (ScoreLayout.lineGap / 2);
+      _drawText(
+        canvas,
+        sharps ? '♯' : '♭',
+        Offset(99 + index * 7.5, y - 14),
+        18,
+      );
     }
   }
 

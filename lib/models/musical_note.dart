@@ -25,6 +25,7 @@ class MusicalNote {
     required this.durationTicks,
     this.sourceEventIndex = -1,
     this.accidental = NoteAccidental.automatic,
+    this.flatSpelling = false,
     this.isRest = false,
     this.tieFromPrevious = false,
     this.tieToNext = false,
@@ -35,20 +36,23 @@ class MusicalNote {
   final int durationTicks;
   final int sourceEventIndex;
   final NoteAccidental accidental;
+  final bool flatSpelling;
   final bool isRest;
   final bool tieFromPrevious;
   final bool tieToNext;
 
-  MusicalNote copyWith({NoteAccidental? accidental}) => MusicalNote(
-    midiPitch: midiPitch,
-    startTick: startTick,
-    durationTicks: durationTicks,
-    sourceEventIndex: sourceEventIndex,
-    accidental: accidental ?? this.accidental,
-    isRest: isRest,
-    tieFromPrevious: tieFromPrevious,
-    tieToNext: tieToNext,
-  );
+  MusicalNote copyWith({NoteAccidental? accidental, bool? flatSpelling}) =>
+      MusicalNote(
+        midiPitch: midiPitch,
+        startTick: startTick,
+        durationTicks: durationTicks,
+        sourceEventIndex: sourceEventIndex,
+        accidental: accidental ?? this.accidental,
+        flatSpelling: flatSpelling ?? this.flatSpelling,
+        isRest: isRest,
+        tieFromPrevious: tieFromPrevious,
+        tieToNext: tieToNext,
+      );
 
   NoteValue get value => NoteValue.values.reduce(
     (a, b) => (a.ticks - durationTicks).abs() <= (b.ticks - durationTicks).abs()

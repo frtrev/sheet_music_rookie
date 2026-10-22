@@ -1,6 +1,6 @@
 # Sheet Music Rookie
 
-An offline Flutter prototype that turns a single sung melody into editable-ready musical data and dynamically rendered notation. Phase 1 supports treble and bass clefs, selectable octave ranges, live YIN pitch detection, syllable-aware note segmentation, rhythm quantization (including dotted values), automatic 4/4 measures, tied bar-line splits, piano-style score playback, a tempo-synchronized metronome, cursor-based punch-in recording, manual note insertion, and persistent recognition tuning.
+An offline Flutter prototype that turns a single sung melody into editable-ready musical data and dynamically rendered notation. Phase 1 supports treble and bass clefs, selectable octave ranges, all 15 standard major key signatures, live YIN pitch detection, syllable-aware note segmentation, rhythm quantization (including dotted values), automatic 4/4 measures, tied bar-line splits, piano-style score playback, a tempo-synchronized metronome, cursor-based punch-in recording, manual note insertion, and persistent recognition tuning.
 
 Octave-clef ranges follow standard sounding-pitch direction: **8 up** writes the captured pitch one octave lower and plays it one octave above the written note; **8 down** writes it one octave higher and plays it one octave below. The same rule applies to manual notes and edit previews.
 
@@ -20,6 +20,8 @@ Tap anywhere on the staff to place the shared score cursor. **Play** starts ther
 When the cursor is over a note, that note is highlighted and the edit bar below the staff becomes active. The up/down arrows transpose it by one semitone, while the left/right arrows choose the next shorter or longer supported duration. An upward alteration is written with a sharp and a downward alteration with a flat. That accidental remains active for the matching staff pitch through the measure, with a natural shown only when a later note cancels it; accidentals reset at the next bar line. Every edit previews only the resulting note for its complete duration without moving the score cursor.
 
 The rest button in the same edit bar changes a selected note into an equal-duration rest. When a rest is selected, the button changes to a note icon and restores the clef's first-line pitch (E4 for treble or G2 for bass). At a blank cursor position within the current measure, the rest button inserts a quarter rest, shortened automatically when less space remains; any preceding blank gap is retained as silence.
+
+Tap the key chip to choose C major, any of the seven sharp major keys, or any of the seven flat major keys. The signature is drawn on the staff and changes the affected written pitches during piano playback; an explicit natural cancels the signature for that note.
 
 Tap the **Metronome off/on** chip to hear an accented four-beat click at the composition tempo while recording. For repeated syllables such as “La, La, La,” open **Voice Detection Settings** and use **Optimize for “La, La, La”**. The optimized capture treats brief consonant gaps as separate onsets and measures repeated notes onset-to-onset for steadier rhythmic values.
 

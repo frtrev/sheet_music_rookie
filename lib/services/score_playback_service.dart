@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/composition.dart';
+import '../models/musical_note.dart';
 
 class ScorePlaybackService {
   ScorePlaybackService({AudioPlayer? player})
@@ -67,10 +68,20 @@ class ScorePlaybackService {
 Uint8List? _renderPianoWave(Composition composition) =>
     const PianoWaveSynthesizer().render(composition);
 
-int playbackMidiPitch(Composition composition, int writtenMidiPitch) =>
-    (writtenMidiPitch + composition.octaveRange.semitones)
-        .clamp(0, 127)
-        .toInt();
+int playbackMidiPitch(
+  Composition composition,
+  int writtenMidiPitch, {
+  NoteAccidental accidental = NoteAccidental.automatic,
+}) {
+  final pitchClass = writtenMidiPitch % 12;
+  final isNatural = const {0, 2, 4, 5, 7, 9, 11}.contains(pitchClass);
+  final keyAlteration = isNatural && accidental != NoteAccidental.natural
+      ? composition.keySignature.alterationForNaturalPitchClass(pitchClass)
+      : 0;
+  return (writtenMidiPitch + keyAlteration + composition.octaveRange.semitones)
+      .clamp(0, 127)
+      .toInt();
+}
 
 /// Produces a self-contained mono WAV with a percussive, harmonic-rich piano
 /// timbre. Generating it in memory keeps playback fully offline and avoids a
@@ -130,13 +141,21 @@ class PianoWaveSynthesizer {
         if (note.tieFromPrevious &&
             tones.isNotEmpty &&
             tones.last.midiPitch ==
-                playbackMidiPitch(composition, note.midiPitch) &&
+                playbackMidiPitch(
+                  composition,
+                  note.midiPitch,
+                  accidental: note.accidental,
+                ) &&
             tones.last.startTick + tones.last.durationTicks == absoluteStart) {
           tones.last.durationTicks += note.durationTicks;
         } else {
           tones.add(
             _Tone(
-              playbackMidiPitch(composition, note.midiPitch),
+              playbackMidiPitch(
+                composition,
+                note.midiPitch,
+                accidental: note.accidental,
+              ),
               absoluteStart,
               note.durationTicks,
             ),

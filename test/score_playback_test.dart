@@ -49,6 +49,24 @@ void main() {
     expect(playbackMidiPitch(down, writtenMidi), 48);
   });
 
+  test('key signatures alter natural notes unless cancelled', () {
+    const gMajor = Composition(
+      clef: ClefType.treble,
+      keySignature: KeySignature.gMajor,
+    );
+    const fMajor = Composition(
+      clef: ClefType.treble,
+      keySignature: KeySignature.fMajor,
+    );
+
+    expect(playbackMidiPitch(gMajor, 65), 66); // F becomes F♯.
+    expect(
+      playbackMidiPitch(gMajor, 65, accidental: NoteAccidental.natural),
+      65,
+    );
+    expect(playbackMidiPitch(fMajor, 71), 70); // B becomes B♭.
+  });
+
   test('rests retain silent time in synthesized playback', () {
     const sampleRate = 8000;
     const composition = Composition(

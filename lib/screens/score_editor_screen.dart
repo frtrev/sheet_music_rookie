@@ -350,6 +350,49 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     );
   }
 
+  Future<void> _showKeySignatureDialog() async {
+    var selected = _engine.composition.value.keySignature;
+    final result = await showDialog<KeySignature>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Choose a major key'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final keySignature in KeySignature.values)
+                  ListTile(
+                    leading: Icon(
+                      keySignature == selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(keySignature.label),
+                    dense: true,
+                    selected: keySignature == selected,
+                    onTap: () => setDialogState(() => selected = keySignature),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result != null) _engine.setKeySignature(result);
+  }
+
   Future<void> _pauseRecording() async {
     await _metronome.stop();
     await _engine.pauseListening();
@@ -429,6 +472,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     await _notePreview.play(
       Composition(
         clef: composition.clef,
+        keySignature: composition.keySignature,
         tempoBpm: composition.tempoBpm,
         measures: [
           Measure(
@@ -581,6 +625,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               valueListenable: _engine.composition,
               builder: (context, composition, _) => _CompositionHeader(
                 composition: composition,
+                onKeySignaturePressed: _showKeySignatureDialog,
                 onMetronomeChanged: (enabled) =>
                     unawaited(_toggleMetronome(enabled)),
               ),
@@ -813,9 +858,11 @@ class _NoteEditControls extends StatelessWidget {
 class _CompositionHeader extends StatelessWidget {
   const _CompositionHeader({
     required this.composition,
+    required this.onKeySignaturePressed,
     required this.onMetronomeChanged,
   });
   final Composition composition;
+  final VoidCallback onKeySignaturePressed;
   final ValueChanged<bool> onMetronomeChanged;
 
   @override
@@ -828,7 +875,12 @@ class _CompositionHeader extends StatelessWidget {
         composition.clef == ClefType.treble ? 'Treble clef' : 'Bass clef',
       ),
       _chip(Icons.swap_vert, composition.octaveRange.label),
-      _chip(Icons.key, composition.keySignature),
+      ActionChip(
+        avatar: const Icon(Icons.key, size: 16),
+        label: Text(composition.keySignature.label),
+        onPressed: onKeySignaturePressed,
+        visualDensity: VisualDensity.compact,
+      ),
       _chip(
         Icons.timer_outlined,
         '${composition.beatsPerMeasure}/${composition.beatUnit}',
