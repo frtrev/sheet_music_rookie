@@ -243,8 +243,33 @@ class TranscriptionEngine {
     }
     if (!canToggleTieAtTick(tick)) return null;
     rawEvents[index] = original.copyWith(tieToNext: true);
+    _normalizeTiedGroupPitch(index);
     _rebuildComposition();
     return true;
+  }
+
+  void _normalizeTiedGroupPitch(int index) {
+    final (start, end) = _tiedGroupBounds(index);
+    final source = rawEvents[start];
+    for (var current = start + 1; current <= end; current++) {
+      rawEvents[current] = rawEvents[current].copyWith(
+        midiPitch: source.midiPitch,
+        frequencyHz: source.frequencyHz,
+        accidental: NoteAccidental.none,
+      );
+    }
+  }
+
+  (int, int) _tiedGroupBounds(int index) {
+    var start = index;
+    while (start > 0 && rawEvents[start - 1].tieToNext) {
+      start--;
+    }
+    var end = index;
+    while (end + 1 < rawEvents.length && rawEvents[end].tieToNext) {
+      end++;
+    }
+    return (start, end);
   }
 
   bool canToggleRestAtTick(int tick) {
@@ -355,9 +380,12 @@ class TranscriptionEngine {
     final eventIndex = eventIndexAtTick(tick);
     if (eventIndex == null) return null;
 
+    final (groupStart, groupEnd) = _tiedGroupBounds(eventIndex);
     final original = rawEvents[eventIndex];
     if (original.isRest && pitchDelta != 0) return null;
-    final originalTicks = _ticksFor(original);
+    final durationEventIndex = groupStart == groupEnd ? eventIndex : groupEnd;
+    final durationEvent = rawEvents[durationEventIndex];
+    final originalTicks = _ticksFor(durationEvent);
     final originalValueIndex = NoteValue.values.indexWhere(
       (value) => value.ticks == originalTicks,
     );
@@ -365,27 +393,37 @@ class TranscriptionEngine {
         .clamp(0, NoteValue.values.length - 1)
         .toInt();
     final nextValue = NoteValue.values[nextValueIndex];
-    final nextMidi = (original.midiPitch + pitchDelta).clamp(0, 127).toInt();
+    final groupPitch = rawEvents[groupStart].midiPitch;
+    final nextMidi = (groupPitch + pitchDelta).clamp(0, 127).toInt();
     final isBlackKey = const {1, 3, 6, 8, 10}.contains(nextMidi % 12);
     final accidental = pitchDelta == 0
-        ? original.accidental
+        ? rawEvents[groupStart].accidental
         : isBlackKey
         ? (pitchDelta > 0 ? NoteAccidental.sharp : NoteAccidental.flat)
         : NoteAccidental.automatic;
     final frequency = 440 * math.pow(2, (nextMidi - 69) / 12);
 
-    rawEvents[eventIndex] = RawNoteEvent(
-      startTimeMs: original.startTimeMs,
-      endTimeMs: original.startTimeMs + _millisecondsForTicks(nextValue.ticks),
-      frequencyHz: frequency.toDouble(),
-      midiPitch: nextMidi,
-      confidence: original.confidence,
-      accidental: accidental,
-      isRest: original.isRest,
-      tieToNext: original.tieToNext,
-    );
+    for (var index = groupStart; index <= groupEnd; index++) {
+      final event = rawEvents[index];
+      final editedTicks = index == durationEventIndex
+          ? nextValue.ticks
+          : _ticksFor(event);
+      rawEvents[index] = RawNoteEvent(
+        startTimeMs: event.startTimeMs,
+        endTimeMs: event.startTimeMs + _millisecondsForTicks(editedTicks),
+        frequencyHz: frequency.toDouble(),
+        midiPitch: nextMidi,
+        confidence: event.confidence,
+        accidental: index == groupStart ? accidental : NoteAccidental.none,
+        isRest: event.isRest,
+        tieToNext: event.tieToNext,
+      );
+    }
     _rebuildComposition();
-    return (midiPitch: nextMidi, durationTicks: nextValue.ticks);
+    final groupTicks = rawEvents
+        .sublist(groupStart, groupEnd + 1)
+        .fold<int>(0, (total, event) => total + _ticksFor(event));
+    return (midiPitch: nextMidi, durationTicks: groupTicks);
   }
 
   void _commitFinalized(RawNoteEvent event, {bool endPunchIn = false}) {

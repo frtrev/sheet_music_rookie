@@ -252,9 +252,10 @@ class ScorePainter extends CustomPainter {
       color: const Color(0xff5e625c),
     );
 
+    final selectedSources = _selectedSourceEvents();
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
-        _drawNote(canvas, measure.index, note, ink);
+        _drawNote(canvas, measure.index, note, ink, selectedSources);
       }
       _drawText(
         canvas,
@@ -270,7 +271,41 @@ class ScorePainter extends CustomPainter {
     if (showPlaybackCursor) _drawPlaybackCursor(canvas);
   }
 
-  void _drawNote(Canvas canvas, int measureIndex, MusicalNote note, Paint ink) {
+  Set<int> _selectedSourceEvents() {
+    final selected = selectedEventIndex;
+    if (selected == null) return const {};
+    final notes = composition.measures
+        .expand((measure) => measure.notes)
+        .toList();
+    final selectedNoteIndex = notes.indexWhere(
+      (note) => note.sourceEventIndex == selected,
+    );
+    if (selectedNoteIndex < 0) return {selected};
+    var start = selectedNoteIndex;
+    while (start > 0 &&
+        notes[start - 1].tieToNext &&
+        notes[start].tieFromPrevious) {
+      start--;
+    }
+    var end = selectedNoteIndex;
+    while (end + 1 < notes.length &&
+        notes[end].tieToNext &&
+        notes[end + 1].tieFromPrevious) {
+      end++;
+    }
+    return {
+      for (var index = start; index <= end; index++)
+        notes[index].sourceEventIndex,
+    };
+  }
+
+  void _drawNote(
+    Canvas canvas,
+    int measureIndex,
+    MusicalNote note,
+    Paint ink,
+    Set<int> selectedSources,
+  ) {
     final center = ScoreLayout.noteCenter(composition, measureIndex, note);
     final x = center.dx;
     final y = center.dy;
@@ -280,7 +315,7 @@ class ScorePainter extends CustomPainter {
       accidental: note.accidental,
     );
 
-    if (note.sourceEventIndex == selectedEventIndex) {
+    if (selectedSources.contains(note.sourceEventIndex)) {
       canvas.drawCircle(
         center,
         15,

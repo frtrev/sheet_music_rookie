@@ -230,7 +230,7 @@ void main() {
       octaveRange: OctaveRange.standard,
       microphone: FakeMicrophoneService(),
     );
-    engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(60, 500)]);
+    engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(64, 500)]);
     engine.notationCursorTick.value = 0;
 
     expect(engine.canToggleTieAtTick(0), isTrue);
@@ -238,6 +238,7 @@ void main() {
     expect(engine.toggleTieAtTick(0), isTrue);
     expect(engine.notationCursorTick.value, 0);
     expect(engine.rawEvents.first.tieToNext, isTrue);
+    expect(engine.rawEvents.last.midiPitch, 60);
     final notes = engine.composition.value.measures.first.notes;
     expect(notes.first.tieToNext, isTrue);
     expect(notes.last.tieFromPrevious, isTrue);
@@ -248,6 +249,26 @@ void main() {
       engine.composition.value.measures.first.notes.first.tieToNext,
       isFalse,
     );
+  });
+
+  test('tied notes edit and preview as one sustained group', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(64, 500)]);
+    engine.toggleTieAtTick(0);
+
+    expect(engine.rawEvents.map((event) => event.midiPitch), [60, 60]);
+    final raised = engine.editNoteAtTick(0, pitchDelta: 1);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [61, 61]);
+    expect(raised, (midiPitch: 61, durationTicks: 960));
+
+    final lengthened = engine.editNoteAtTick(0, durationDelta: 1);
+    expect(engine.rawEvents.map((event) => event.durationMs), [500, 750]);
+    expect(lengthened, (midiPitch: 61, durationTicks: 1200));
+    expect(engine.rawEvents.first.tieToNext, isTrue);
   });
 
   test('ties cannot be added to a rest or without a following note', () {
