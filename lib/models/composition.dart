@@ -17,6 +17,21 @@ enum OctaveRange {
 
 enum RecordingMode { fixedTempo, freeSinging }
 
+enum MetronomeMode {
+  off('Metronome off'),
+  accented('Metronome on'),
+  single('Metronome single');
+
+  const MetronomeMode(this.label);
+  final String label;
+
+  MetronomeMode get next => switch (this) {
+    MetronomeMode.off => MetronomeMode.accented,
+    MetronomeMode.accented => MetronomeMode.single,
+    MetronomeMode.single => MetronomeMode.off,
+  };
+}
+
 enum KeySignature {
   cMajor('C Major', 0),
   gMajor('G Major', 1),
@@ -69,7 +84,9 @@ class Composition {
     required this.clef,
     this.octaveRange = OctaveRange.standard,
     this.recordingMode = RecordingMode.fixedTempo,
-    this.metronomeEnabled = false,
+    this.metronomeMode = MetronomeMode.off,
+    this.metronomeVolume = .55,
+    this.playbackVolume = 1,
     this.microphoneActive = true,
     this.measures = const [Measure(index: 0)],
   });
@@ -82,14 +99,18 @@ class Composition {
   final ClefType clef;
   final OctaveRange octaveRange;
   final RecordingMode recordingMode;
-  final bool metronomeEnabled;
+  final MetronomeMode metronomeMode;
+  final double metronomeVolume;
+  final double playbackVolume;
   final bool microphoneActive;
   final List<Measure> measures;
 
   Composition copyWith({
     List<Measure>? measures,
     bool? microphoneActive,
-    bool? metronomeEnabled,
+    MetronomeMode? metronomeMode,
+    double? metronomeVolume,
+    double? playbackVolume,
     KeySignature? keySignature,
   }) {
     return Composition(
@@ -101,7 +122,9 @@ class Composition {
       clef: clef,
       octaveRange: octaveRange,
       recordingMode: recordingMode,
-      metronomeEnabled: metronomeEnabled ?? this.metronomeEnabled,
+      metronomeMode: metronomeMode ?? this.metronomeMode,
+      metronomeVolume: metronomeVolume ?? this.metronomeVolume,
+      playbackVolume: playbackVolume ?? this.playbackVolume,
       microphoneActive: microphoneActive ?? this.microphoneActive,
       measures: measures ?? this.measures,
     );

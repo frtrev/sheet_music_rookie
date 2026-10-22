@@ -539,8 +539,18 @@ class TranscriptionEngine {
     await _settingsService.save(value);
   }
 
-  void setMetronomeEnabled(bool enabled) {
-    composition.value = composition.value.copyWith(metronomeEnabled: enabled);
+  void setMetronomeMode(MetronomeMode mode) {
+    composition.value = composition.value.copyWith(metronomeMode: mode);
+  }
+
+  void setVolumes({
+    required double playbackVolume,
+    required double metronomeVolume,
+  }) {
+    composition.value = composition.value.copyWith(
+      playbackVolume: playbackVolume.clamp(0.0, 1.0).toDouble(),
+      metronomeVolume: metronomeVolume.clamp(0.0, 1.0).toDouble(),
+    );
   }
 
   void setKeySignature(KeySignature keySignature) {

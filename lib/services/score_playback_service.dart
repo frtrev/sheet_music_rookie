@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/composition.dart';
 import '../models/musical_note.dart';
+import 'metronome_service.dart';
 
 class ScorePlaybackService {
   ScorePlaybackService({AudioPlayer? player})
@@ -124,9 +125,19 @@ class PianoWaveSynthesizer {
             .20 * math.sin(phase * 2.002) +
             .10 * math.sin(phase * 3.006) +
             .045 * math.sin(phase * 4.012);
-        samples[startSample + index] += .42 * envelope * timbre;
+        samples[startSample + index] +=
+            .42 * composition.playbackVolume * envelope * timbre;
       }
     }
+
+    mixMetronomeClicks(
+      samples,
+      sampleRate: sampleRate,
+      tempoBpm: composition.tempoBpm,
+      beatsPerMeasure: composition.beatsPerMeasure,
+      mode: composition.metronomeMode,
+      gain: composition.metronomeVolume,
+    );
 
     return _encodeWave(samples);
   }

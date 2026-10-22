@@ -393,6 +393,68 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (result != null) _engine.setKeySignature(result);
   }
 
+  Future<void> _showVolumeDialog() async {
+    final composition = _engine.composition.value;
+    var playbackVolume = composition.playbackVolume;
+    var metronomeVolume = composition.metronomeVolume;
+    final result = await showDialog<(double, double)>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Audio volumes'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Music playback ${(playbackVolume * 100).round()}%'),
+                Slider(
+                  value: playbackVolume,
+                  divisions: 20,
+                  onChanged: (value) =>
+                      setDialogState(() => playbackVolume = value),
+                ),
+                const SizedBox(height: 8),
+                Text('Metronome ${(metronomeVolume * 100).round()}%'),
+                Slider(
+                  value: metronomeVolume,
+                  divisions: 20,
+                  onChanged: (value) =>
+                      setDialogState(() => metronomeVolume = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(context, (playbackVolume, metronomeVolume)),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    final wasPlaying = _playback.isPlaying.value;
+    final playbackPosition = _playback.position.value;
+    _engine.setVolumes(playbackVolume: result.$1, metronomeVolume: result.$2);
+    if (wasPlaying) {
+      await _playback.stop();
+      await _playback.play(
+        _engine.composition.value,
+        startAt: playbackPosition,
+      );
+    } else {
+      await _syncMetronome();
+    }
+  }
+
   Future<void> _pauseRecording() async {
     await _metronome.stop();
     await _engine.pauseListening();
@@ -474,6 +536,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         clef: composition.clef,
         keySignature: composition.keySignature,
         tempoBpm: composition.tempoBpm,
+        playbackVolume: composition.playbackVolume,
         measures: [
           Measure(
             index: 0,
@@ -491,8 +554,18 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     );
   }
 
-  Future<void> _toggleMetronome(bool enabled) async {
-    _engine.setMetronomeEnabled(enabled);
+  Future<void> _changeMetronomeMode(MetronomeMode mode) async {
+    final wasPlaying = _playback.isPlaying.value;
+    final playbackPosition = _playback.position.value;
+    _engine.setMetronomeMode(mode);
+    if (wasPlaying) {
+      await _playback.stop();
+      await _playback.play(
+        _engine.composition.value,
+        startAt: playbackPosition,
+      );
+      return;
+    }
     await _syncMetronome();
   }
 
@@ -503,16 +576,20 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         status != MicrophoneStatus.paused &&
         status != MicrophoneStatus.unavailable &&
         status != MicrophoneStatus.starting;
-    if (!composition.metronomeEnabled ||
+    if (composition.metronomeMode == MetronomeMode.off ||
         !recording ||
         _playback.isPlaying.value) {
       await _metronome.stop();
       return;
     }
     try {
-      await _metronome.start(composition.tempoBpm);
+      await _metronome.start(
+        composition.tempoBpm,
+        composition.metronomeMode,
+        volume: composition.metronomeVolume,
+      );
     } catch (_) {
-      _engine.setMetronomeEnabled(false);
+      _engine.setMetronomeMode(MetronomeMode.off);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('The metronome could not start.')),
@@ -626,8 +703,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               builder: (context, composition, _) => _CompositionHeader(
                 composition: composition,
                 onKeySignaturePressed: _showKeySignatureDialog,
-                onMetronomeChanged: (enabled) =>
-                    unawaited(_toggleMetronome(enabled)),
+                onVolumesPressed: _showVolumeDialog,
+                onMetronomeChanged: (mode) =>
+                    unawaited(_changeMetronomeMode(mode)),
               ),
             ),
             const SizedBox(height: 10),
@@ -859,11 +937,13 @@ class _CompositionHeader extends StatelessWidget {
   const _CompositionHeader({
     required this.composition,
     required this.onKeySignaturePressed,
+    required this.onVolumesPressed,
     required this.onMetronomeChanged,
   });
   final Composition composition;
   final VoidCallback onKeySignaturePressed;
-  final ValueChanged<bool> onMetronomeChanged;
+  final VoidCallback onVolumesPressed;
+  final ValueChanged<MetronomeMode> onMetronomeChanged;
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -893,13 +973,21 @@ class _CompositionHeader extends StatelessWidget {
       _chip(Icons.straighten, 'Fixed tempo'),
       ActionChip(
         avatar: Icon(
-          composition.metronomeEnabled ? Icons.music_note : Icons.music_off,
+          composition.metronomeMode == MetronomeMode.off
+              ? Icons.music_off
+              : composition.metronomeMode == MetronomeMode.single
+              ? Icons.volume_down
+              : Icons.music_note,
           size: 16,
         ),
-        label: Text(
-          composition.metronomeEnabled ? 'Metronome on' : 'Metronome off',
-        ),
-        onPressed: () => onMetronomeChanged(!composition.metronomeEnabled),
+        label: Text(composition.metronomeMode.label),
+        onPressed: () => onMetronomeChanged(composition.metronomeMode.next),
+        visualDensity: VisualDensity.compact,
+      ),
+      ActionChip(
+        avatar: const Icon(Icons.volume_up, size: 16),
+        label: const Text('Volumes'),
+        onPressed: onVolumesPressed,
         visualDensity: VisualDensity.compact,
       ),
     ],

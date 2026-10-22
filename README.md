@@ -23,7 +23,7 @@ The rest button in the same edit bar changes a selected note into an equal-durat
 
 Tap the key chip to choose C major, any of the seven sharp major keys, or any of the seven flat major keys. The signature is drawn on the staff and changes the affected written pitches during piano playback; an explicit natural cancels the signature for that note.
 
-Tap the **Metronome off/on** chip to hear an accented four-beat click at the composition tempo while recording. For repeated syllables such as “La, La, La,” open **Voice Detection Settings** and use **Optimize for “La, La, La”**. The optimized capture treats brief consonant gaps as separate onsets and measures repeated notes onset-to-onset for steadier rhythmic values.
+Tap the metronome chip to cycle through **On**, **Single**, and **Off**. On uses a stronger click on the first quarter note of each measure and regular clicks on the remaining beats; Single uses the same quiet “tsk” on every quarter note. The **Volumes** chip opens independent sliders for piano playback and metronome level. Recording-volume changes do not restart the beat grid. Recording uses one continuous click track with no decoder restart at measure boundaries, while playback mixes the click track directly into the piano audio so notes and clicks stay sample-aligned even when playback starts from the cursor. For repeated syllables such as “La, La, La,” open **Voice Detection Settings** and use **Optimize for “La, La, La”**. The optimized capture treats brief consonant gaps as separate onsets and measures repeated notes onset-to-onset for steadier rhythmic values.
 
 ## Verification
 
