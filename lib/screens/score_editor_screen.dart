@@ -6,8 +6,10 @@ import '../audio/microphone_service.dart';
 import '../models/composition.dart';
 import '../models/measure.dart';
 import '../models/musical_note.dart';
+import '../models/raw_note_event.dart';
 import '../notation/rest_symbol.dart';
 import '../notation/score_renderer.dart';
+import '../services/composition_storage_service.dart';
 import '../services/metronome_service.dart';
 import '../services/score_playback_service.dart';
 import '../transcription/transcription_engine.dart';
@@ -19,9 +21,15 @@ class ScoreEditorScreen extends StatefulWidget {
     super.key,
     required this.clef,
     required this.octaveRange,
+    this.initialComposition,
+    this.initialEvents = const [],
+    this.savePath,
   });
   final ClefType clef;
   final OctaveRange octaveRange;
+  final Composition? initialComposition;
+  final List<RawNoteEvent> initialEvents;
+  final String? savePath;
 
   @override
   State<ScoreEditorScreen> createState() => _ScoreEditorScreenState();
@@ -33,12 +41,15 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   late final ScorePlaybackService _playback;
   late final ScorePlaybackService _notePreview;
   late final MetronomeService _metronome;
+  final CompositionStorageService _storage = CompositionStorageService();
   final ScrollController _scoreScroll = ScrollController();
   final ScrollController _pageScroll = ScrollController();
   bool _pausedByUser = false;
   bool _settingsExpanded = false;
   bool _resumeListeningAfterPlayback = false;
   bool _cursorScrollScheduled = false;
+  bool _saving = false;
+  String? _savePath;
 
   @override
   void initState() {
@@ -47,7 +58,10 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine = TranscriptionEngine(
       clef: widget.clef,
       octaveRange: widget.octaveRange,
+      initialComposition: widget.initialComposition,
+      initialEvents: widget.initialEvents,
     );
+    _savePath = widget.savePath;
     _playback = ScorePlaybackService()..onComplete = _playbackCompleted;
     _notePreview = ScorePlaybackService();
     _metronome = MetronomeService();
@@ -158,6 +172,82 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.clear();
     await _playback.seek(Duration.zero);
     if (_scoreScroll.hasClients) _scoreScroll.jumpTo(0);
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    var title = _engine.composition.value.title;
+    if (_savePath == null) {
+      final controller = TextEditingController(
+        text: title == 'Untitled Composition' ? '' : title,
+      );
+      final selectedTitle = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Save composition'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Title',
+              hintText: 'My composition',
+            ),
+            onSubmitted: (value) {
+              final trimmed = value.trim();
+              if (trimmed.isNotEmpty) Navigator.pop(context, trimmed);
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final trimmed = controller.text.trim();
+                if (trimmed.isNotEmpty) Navigator.pop(context, trimmed);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      controller.dispose();
+      if (selectedTitle == null) return;
+      title = selectedTitle;
+      _engine.setTitle(title);
+    }
+
+    setState(() => _saving = true);
+    try {
+      if (_engine.microphoneStatus.value != MicrophoneStatus.paused &&
+          _engine.microphoneStatus.value != MicrophoneStatus.unavailable) {
+        _pausedByUser = true;
+        await _pauseRecording();
+      }
+      final saved = await _storage.save(
+        composition: _engine.composition.value,
+        rawEvents: _engine.rawEvents,
+        existingPath: _savePath,
+      );
+      _savePath = saved.path;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Saved “$title” locally as compressed MusicXML.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The composition could not be saved.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   Future<void> _togglePlayback() async {
@@ -636,8 +726,22 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
             icon: const Icon(Icons.arrow_back),
             tooltip: 'Back',
           ),
-          title: const Text('Untitled Composition'),
+          title: ValueListenableBuilder<Composition>(
+            valueListenable: _engine.composition,
+            builder: (context, composition, _) =>
+                Text(composition.title, overflow: TextOverflow.ellipsis),
+          ),
           actions: [
+            IconButton(
+              onPressed: _saving ? null : _save,
+              icon: _saving
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save_outlined),
+              tooltip: 'Save Composition',
+            ),
             ValueListenableBuilder<bool>(
               valueListenable: _playback.isPlaying,
               builder: (context, playing, _) => IconButton(

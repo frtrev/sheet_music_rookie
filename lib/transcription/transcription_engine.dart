@@ -20,12 +20,16 @@ class TranscriptionEngine {
   TranscriptionEngine({
     required ClefType clef,
     required OctaveRange octaveRange,
+    Composition? initialComposition,
+    List<RawNoteEvent> initialEvents = const [],
     MicrophoneService? microphone,
     SettingsService? settingsService,
   }) : _microphone = microphone ?? MicrophoneService(),
        _settingsService = settingsService ?? SettingsService(),
+       rawEvents = [...initialEvents],
        composition = ValueNotifier(
-         Composition(clef: clef, octaveRange: octaveRange),
+         initialComposition ??
+             Composition(clef: clef, octaveRange: octaveRange),
        );
 
   final MicrophoneService _microphone;
@@ -35,7 +39,7 @@ class TranscriptionEngine {
   final NoteSegmenter _segmenter = NoteSegmenter();
   final MeasureBuilder _measureBuilder = const MeasureBuilder();
   final RhythmQuantizer _quantizer = const RhythmQuantizer();
-  final List<RawNoteEvent> rawEvents = [];
+  final List<RawNoteEvent> rawEvents;
   StreamSubscription<AudioFrame>? _subscription;
   int _lastRenderedActiveTicks = 0;
   bool _processing = false;
@@ -556,6 +560,10 @@ class TranscriptionEngine {
   void setKeySignature(KeySignature keySignature) {
     composition.value = composition.value.copyWith(keySignature: keySignature);
     _rebuildComposition();
+  }
+
+  void setTitle(String title) {
+    composition.value = composition.value.copyWith(title: title.trim());
   }
 
   void clear() {

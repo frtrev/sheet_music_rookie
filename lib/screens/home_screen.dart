@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/composition.dart';
+import '../services/composition_storage_service.dart';
 import 'score_editor_screen.dart';
 import 'settings_screen.dart';
 
@@ -50,13 +51,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Opening saved compositions is coming in a future phase.',
-                        ),
-                      ),
-                    ),
+                    onPressed: () => _openSaved(context),
                     icon: const Icon(Icons.folder_open),
                     label: const Text('Open'),
                     style: OutlinedButton.styleFrom(
@@ -140,6 +135,79 @@ class HomeScreen extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Future<void> _openSaved(BuildContext context) async {
+    final service = CompositionStorageService();
+    List<SavedComposition> saved;
+    try {
+      saved = await service.listSaved();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved compositions could not be read.'),
+          ),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    if (saved.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No saved compositions yet.')),
+      );
+      return;
+    }
+    final selected = await showDialog<SavedComposition>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Open composition'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: saved.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = saved[index];
+              final date = item.modifiedAt.toLocal();
+              final dateLabel =
+                  '${date.month}/${date.day}/${date.year} '
+                  '${date.hour.toString().padLeft(2, '0')}:'
+                  '${date.minute.toString().padLeft(2, '0')}';
+              return ListTile(
+                leading: const Icon(Icons.music_note),
+                title: Text(item.composition.title),
+                subtitle: Text(
+                  '${item.composition.keySignature.name} • $dateLabel',
+                ),
+                onTap: () => Navigator.pop(context, item),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (selected == null || !context.mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScoreEditorScreen(
+          clef: selected.composition.clef,
+          octaveRange: selected.composition.octaveRange,
+          initialComposition: selected.composition,
+          initialEvents: selected.rawEvents,
+          savePath: selected.path,
+        ),
+      ),
+    );
   }
 
   Future<OctaveRange?> _chooseRange(BuildContext context) {

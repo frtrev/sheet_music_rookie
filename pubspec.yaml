@@ -37,6 +37,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   record: ^6.2.1
   shared_preferences: ^2.5.3
+  archive: ^4.5.2
+  xml: ^7.1.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

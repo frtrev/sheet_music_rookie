@@ -106,6 +106,7 @@ class Composition {
   final List<Measure> measures;
 
   Composition copyWith({
+    String? title,
     List<Measure>? measures,
     bool? microphoneActive,
     MetronomeMode? metronomeMode,
@@ -114,7 +115,7 @@ class Composition {
     KeySignature? keySignature,
   }) {
     return Composition(
-      title: title,
+      title: title ?? this.title,
       keySignature: keySignature ?? this.keySignature,
       beatsPerMeasure: beatsPerMeasure,
       beatUnit: beatUnit,
