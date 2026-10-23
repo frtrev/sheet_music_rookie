@@ -46,6 +46,7 @@ class TranscriptionEngine {
   List<RawNoteEvent>? _punchInBase;
   final List<RawNoteEvent> _punchInEvents = [];
   int _punchInStartTick = 0;
+  bool _captureEnabled = true;
 
   final ValueNotifier<MicrophoneStatus> microphoneStatus = ValueNotifier(
     MicrophoneStatus.starting,
@@ -59,6 +60,18 @@ class TranscriptionEngine {
   final ValueNotifier<Composition> composition;
 
   bool get isPunchingIn => _punchInBase != null;
+  bool get captureEnabled => _captureEnabled;
+
+  void setCaptureEnabled(bool enabled) {
+    if (_captureEnabled == enabled) return;
+    _captureEnabled = enabled;
+    _segmenter.reset();
+    _smoother.clear();
+    _lastRenderedActiveTicks = 0;
+    currentNoteDurationMs.value = 0;
+    if (!enabled && isPunchingIn) _finishPunchIn();
+    _rebuildComposition();
+  }
 
   Future<void> initialize() async {
     settings.value = await _settingsService.load();
@@ -87,9 +100,9 @@ class TranscriptionEngine {
       livePitch.value?.timestampMs ?? 0,
       settings.value,
     );
-    if (completed != null) {
+    if (completed != null && _captureEnabled) {
       _commitFinalized(completed, endPunchIn: isPunchingIn);
-    } else if (isPunchingIn) {
+    } else if (_captureEnabled && isPunchingIn) {
       _finishPunchIn();
     }
     _rebuildComposition();
@@ -126,8 +139,12 @@ class TranscriptionEngine {
         frame.timestampMs,
         settings.value,
       );
-      final punchInEnded = update.finalized != null && isPunchingIn && !isVoice;
-      if (update.finalized != null) {
+      final punchInEnded =
+          _captureEnabled &&
+          update.finalized != null &&
+          isPunchingIn &&
+          !isVoice;
+      if (_captureEnabled && update.finalized != null) {
         _commitFinalized(update.finalized!, endPunchIn: punchInEnded);
       }
       currentNoteDurationMs.value = update.active?.durationMs ?? 0;
@@ -137,7 +154,9 @@ class TranscriptionEngine {
               update.active!.durationMs,
               composition.value.tempoBpm,
             );
-      if (update.finalized != null || activeTicks != _lastRenderedActiveTicks) {
+      if (_captureEnabled &&
+          (update.finalized != null ||
+              activeTicks != _lastRenderedActiveTicks)) {
         _lastRenderedActiveTicks = activeTicks;
         _rebuildComposition(active: update.active);
       }

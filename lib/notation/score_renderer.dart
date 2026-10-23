@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/composition.dart';
@@ -154,6 +155,8 @@ class ScoreView extends StatelessWidget {
     this.selectedEventIndex,
     this.playbackPosition = Duration.zero,
     this.showPlaybackCursor = false,
+    this.practiceTargetTick,
+    this.practiceProgress,
     this.onCursorMoved,
   });
 
@@ -162,6 +165,8 @@ class ScoreView extends StatelessWidget {
   final int? selectedEventIndex;
   final Duration playbackPosition;
   final bool showPlaybackCursor;
+  final int? practiceTargetTick;
+  final ValueListenable<double>? practiceProgress;
   final ValueChanged<Duration>? onCursorMoved;
 
   @override
@@ -180,13 +185,31 @@ class ScoreView extends StatelessWidget {
           onTapUp: onCursorMoved == null
               ? null
               : (details) => _handleTap(details.localPosition),
-          child: CustomPaint(
-            size: Size(width, 250),
-            painter: ScorePainter(
-              composition,
-              selectedEventIndex: selectedEventIndex,
-              playbackPosition: playbackPosition,
-              showPlaybackCursor: showPlaybackCursor,
+          child: SizedBox(
+            width: width,
+            height: 250,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                CustomPaint(
+                  painter: ScorePainter(
+                    composition,
+                    selectedEventIndex: selectedEventIndex,
+                    playbackPosition: playbackPosition,
+                    showPlaybackCursor: showPlaybackCursor,
+                  ),
+                ),
+                if (practiceTargetTick != null && practiceProgress != null)
+                  IgnorePointer(
+                    child: CustomPaint(
+                      painter: PracticeProgressPainter(
+                        composition,
+                        targetTick: practiceTargetTick!,
+                        progress: practiceProgress!,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -198,6 +221,74 @@ class ScoreView extends StatelessWidget {
     final ticks = ScoreLayout.tickAtX(composition, position.dx);
     onCursorMoved?.call(ScoreLayout.durationAt(ticks, composition.tempoBpm));
   }
+}
+
+class PracticeProgressPainter extends CustomPainter {
+  PracticeProgressPainter(
+    this.composition, {
+    required this.targetTick,
+    required this.progress,
+  }) : super(repaint: progress);
+
+  final Composition composition;
+  final int targetTick;
+  final ValueListenable<double> progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = _targetCenter();
+    if (center == null) return;
+    const radius = 16.0;
+    final circle = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = const Color(0x4439b86d)
+        ..style = PaintingStyle.fill,
+    );
+
+    final amount = progress.value.clamp(0.0, 1.0).toDouble();
+    if (amount > 0) {
+      final fill = Path()
+        ..moveTo(center.dx, center.dy)
+        ..arcTo(circle, -math.pi / 2, math.pi * 2 * amount, false)
+        ..close();
+      canvas.drawPath(
+        fill,
+        Paint()
+          ..color = const Color(0x99318f58)
+          ..style = PaintingStyle.fill,
+      );
+    }
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = const Color(0xaa318f58)
+        ..strokeWidth = 1.5
+        ..style = PaintingStyle.stroke,
+    );
+  }
+
+  Offset? _targetCenter() {
+    final capacity = composition.beatsPerMeasure * 480;
+    for (final measure in composition.measures) {
+      for (final note in measure.notes) {
+        final absoluteTick = measure.index * capacity + note.startTick;
+        if (!note.isRest && absoluteTick == targetTick) {
+          return ScoreLayout.noteCenter(composition, measure.index, note);
+        }
+      }
+    }
+    return null;
+  }
+
+  @override
+  bool shouldRepaint(covariant PracticeProgressPainter oldDelegate) =>
+      oldDelegate.composition != composition ||
+      oldDelegate.targetTick != targetTick ||
+      oldDelegate.progress != progress;
 }
 
 class ScorePainter extends CustomPainter {
