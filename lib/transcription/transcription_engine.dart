@@ -141,7 +141,12 @@ class TranscriptionEngine {
         _lastRenderedActiveTicks = activeTicks;
         _rebuildComposition(active: update.active);
       }
-      if (punchInEnded) unawaited(_pauseAfterPunchIn());
+      if (punchInEnded) {
+        // A pause in the voice completes the current overwrite, but it should
+        // not turn recording off. Keep a fresh punch-in anchored at the new
+        // cursor so the next sung note behaves like recording a new sheet.
+        beginPunchInAt(notationCursorTick.value);
+      }
     } finally {
       _processing = false;
     }
@@ -152,7 +157,9 @@ class TranscriptionEngine {
         ? _punchInEvents
         : [..._punchInEvents, active];
     final events = isPunchingIn
-        ? _spliceEvents(_punchInBase!, _punchInStartTick, preview)
+        ? preview.isEmpty
+              ? _punchInBase!
+              : _spliceEvents(_punchInBase!, _punchInStartTick, preview)
         : [...rawEvents, ?active];
     composition.value = composition.value.copyWith(
       measures: _measureBuilder.build(
@@ -171,13 +178,17 @@ class TranscriptionEngine {
   }
 
   void beginPunchInAt(int tick) {
+    // Moving the cursor while recording commits any completed notes from the
+    // previous punch-in. The active, unfinished sound is intentionally reset
+    // so it cannot leak into the newly selected note.
+    if (isPunchingIn) _finishPunchIn();
     _segmenter.reset();
     _smoother.clear();
     _lastRenderedActiveTicks = 0;
     currentNoteDurationMs.value = 0;
     _punchInBase = [...rawEvents];
     _punchInEvents.clear();
-    _punchInStartTick = tick.clamp(0, _totalTicks(rawEvents)).toInt();
+    _punchInStartTick = _eventStartAtTick(tick);
     notationCursorTick.value = _punchInStartTick;
     _rebuildComposition();
   }
@@ -451,6 +462,13 @@ class TranscriptionEngine {
   void _finishPunchIn() {
     final base = _punchInBase;
     if (base == null) return;
+    if (_punchInEvents.isEmpty) {
+      // Merely moving the recording cursor is not an edit. Splicing an empty
+      // replacement inside a note would divide that note at every tap.
+      _punchInBase = null;
+      notationCursorTick.value = _punchInStartTick;
+      return;
+    }
     final endTick = _punchInStartTick + _totalTicks(_punchInEvents);
     rawEvents
       ..clear()
@@ -460,13 +478,16 @@ class TranscriptionEngine {
     notationCursorTick.value = endTick;
   }
 
-  Future<void> _pauseAfterPunchIn() async {
-    await _subscription?.cancel();
-    _subscription = null;
-    await _microphone.stop();
-    composition.value = composition.value.copyWith(microphoneActive: false);
-    microphoneStatus.value = MicrophoneStatus.paused;
-    currentNoteDurationMs.value = 0;
+  int _eventStartAtTick(int requestedTick) {
+    final total = _totalTicks(rawEvents);
+    final tick = requestedTick.clamp(0, total).toInt();
+    var position = 0;
+    for (final event in rawEvents) {
+      final end = position + _ticksFor(event);
+      if (tick >= position && tick < end) return position;
+      position = end;
+    }
+    return tick;
   }
 
   List<RawNoteEvent> _spliceEvents(

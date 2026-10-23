@@ -290,18 +290,41 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (!started) await _resumeAfterPlaybackIfNeeded();
   }
 
-  Future<void> _movePlaybackCursor(Duration position) async {
-    await _notePreview.stop(resetPosition: true);
-    if (!_playback.isPlaying.value &&
-        _engine.microphoneStatus.value != MicrophoneStatus.paused &&
-        _engine.microphoneStatus.value != MicrophoneStatus.unavailable) {
+  Future<void> _toggleRecording() async {
+    final status = _engine.microphoneStatus.value;
+    final recording =
+        status == MicrophoneStatus.listening ||
+        status == MicrophoneStatus.voiceDetected ||
+        status == MicrophoneStatus.silence;
+    if (recording) {
       _pausedByUser = true;
       await _pauseRecording();
+      return;
     }
-    _engine.notationCursorTick.value = ScoreLayout.ticksAt(
+    if (status == MicrophoneStatus.starting ||
+        status == MicrophoneStatus.unavailable) {
+      return;
+    }
+    await _startRecordingAtCursor();
+  }
+
+  Future<void> _movePlaybackCursor(Duration position) async {
+    await _notePreview.stop(resetPosition: true);
+    final tick = ScoreLayout.ticksAt(
       position,
       _engine.composition.value.tempoBpm,
     );
+    final status = _engine.microphoneStatus.value;
+    final recording =
+        !_playback.isPlaying.value &&
+        status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable;
+    if (recording) {
+      _engine.beginPunchInAt(tick);
+      _pausedByUser = false;
+    } else {
+      _engine.notationCursorTick.value = tick;
+    }
     await _playback.seek(position);
   }
 
@@ -742,35 +765,6 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                   : const Icon(Icons.save_outlined),
               tooltip: 'Save Composition',
             ),
-            ValueListenableBuilder<bool>(
-              valueListenable: _playback.isPlaying,
-              builder: (context, playing, _) => IconButton(
-                tooltip: playing ? 'Stop Playback' : 'Play Score',
-                icon: Icon(
-                  playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
-                ),
-                onPressed: _togglePlayback,
-              ),
-            ),
-            ValueListenableBuilder<MicrophoneStatus>(
-              valueListenable: _engine.microphoneStatus,
-              builder: (context, status, _) {
-                final paused = status == MicrophoneStatus.paused;
-                return IconButton(
-                  tooltip: paused ? 'Resume Listening' : 'Pause Listening',
-                  icon: Icon(paused ? Icons.mic : Icons.mic_off),
-                  onPressed: () {
-                    if (_playback.isPlaying.value) return;
-                    if (paused) {
-                      unawaited(_startRecordingAtCursor());
-                    } else {
-                      _pausedByUser = true;
-                      unawaited(_pauseRecording());
-                    }
-                  },
-                );
-              },
-            ),
             IconButton(
               onPressed: _showNoteMenu,
               icon: const Icon(Icons.note_add_outlined),
@@ -841,7 +835,29 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 12),
+            ValueListenableBuilder<MicrophoneStatus>(
+              valueListenable: _engine.microphoneStatus,
+              builder: (context, status, _) => ValueListenableBuilder<bool>(
+                valueListenable: _playback.isPlaying,
+                builder: (context, playing, _) {
+                  final recording =
+                      status == MicrophoneStatus.listening ||
+                      status == MicrophoneStatus.voiceDetected ||
+                      status == MicrophoneStatus.silence;
+                  return _TransportControls(
+                    recording: recording,
+                    playing: playing,
+                    recordEnabled:
+                        status != MicrophoneStatus.starting &&
+                        status != MicrophoneStatus.unavailable,
+                    onRecord: () => unawaited(_toggleRecording()),
+                    onPlay: () => unawaited(_togglePlayback()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
             ValueListenableBuilder<Composition>(
               valueListenable: _engine.composition,
               builder: (context, _, _) => ValueListenableBuilder<int>(
@@ -868,7 +884,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
               child: Text(
-                'Tap anywhere on the staff to place the cursor. Play and Record start there; recording overwrites until you pause singing.',
+                'Tap anywhere on the staff to place the cursor. Recording stays active and continues overwriting from the selected note.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.black54),
               ),
@@ -943,6 +959,159 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     unawaited(_metronome.dispose());
     unawaited(_engine.dispose());
     super.dispose();
+  }
+}
+
+class _TransportControls extends StatelessWidget {
+  const _TransportControls({
+    required this.recording,
+    required this.playing,
+    required this.recordEnabled,
+    required this.onRecord,
+    required this.onPlay,
+  });
+
+  final bool recording;
+  final bool playing;
+  final bool recordEnabled;
+  final VoidCallback onRecord;
+  final VoidCallback onPlay;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Expanded(
+        child: _TransportButton(
+          key: const ValueKey('record-transport'),
+          label: recording ? 'Stop' : 'Record',
+          semanticsLabel: recording ? 'Stop recording' : 'Start recording',
+          icon: recording
+              ? Icons.stop_rounded
+              : Icons.fiber_manual_record_rounded,
+          active: recording,
+          enabled: recordEnabled,
+          activeColor: const Color(0xffd9384e),
+          onPressed: onRecord,
+        ),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: _TransportButton(
+          key: const ValueKey('play-transport'),
+          label: playing ? 'Stop' : 'Play',
+          semanticsLabel: playing ? 'Stop playback' : 'Play score',
+          icon: playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
+          active: playing,
+          enabled: true,
+          activeColor: const Color(0xff16865a),
+          onPressed: onPlay,
+        ),
+      ),
+    ],
+  );
+}
+
+class _TransportButton extends StatelessWidget {
+  const _TransportButton({
+    super.key,
+    required this.label,
+    required this.semanticsLabel,
+    required this.icon,
+    required this.active,
+    required this.enabled,
+    required this.activeColor,
+    required this.onPressed,
+  });
+
+  final String label;
+  final String semanticsLabel;
+  final IconData icon;
+  final bool active;
+  final bool enabled;
+  final Color activeColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = active
+        ? Colors.white
+        : enabled
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onSurface.withAlpha(90);
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: semanticsLabel,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          gradient: active
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [activeColor.withAlpha(225), activeColor],
+                )
+              : null,
+          color: active ? null : theme.colorScheme.surface,
+          border: Border.all(
+            color: active
+                ? activeColor
+                : theme.colorScheme.outlineVariant.withAlpha(190),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: active
+                  ? activeColor.withAlpha(60)
+                  : Colors.black.withAlpha(12),
+              blurRadius: active ? 16 : 8,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            child: SizedBox(
+              height: 62,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 180),
+                    style: theme.textTheme.titleMedium!.copyWith(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .2,
+                    ),
+                    child: Text(label),
+                  ),
+                  const SizedBox(width: 10),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    transitionBuilder: (child, animation) => ScaleTransition(
+                      scale: animation,
+                      child: FadeTransition(opacity: animation, child: child),
+                    ),
+                    child: Icon(
+                      icon,
+                      key: ValueKey(icon),
+                      color: foreground,
+                      size: 26,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

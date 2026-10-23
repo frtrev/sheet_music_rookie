@@ -6,6 +6,7 @@ import 'package:sheet_music_rookie/models/musical_note.dart';
 import 'package:sheet_music_rookie/models/raw_note_event.dart';
 import 'package:sheet_music_rookie/notation/score_renderer.dart';
 import 'package:sheet_music_rookie/transcription/transcription_engine.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 RawNoteEvent rawEvent(int midi, int durationMs, {int startTimeMs = 0}) =>
     RawNoteEvent(
@@ -17,20 +18,31 @@ RawNoteEvent rawEvent(int midi, int durationMs, {int startTimeMs = 0}) =>
     );
 
 class FakeMicrophoneService implements MicrophoneService {
+  int startCount = 0;
+  int stopCount = 0;
+
   @override
   Stream<AudioFrame> get frames => const Stream.empty();
 
   @override
-  Future<bool> start() async => true;
+  Future<bool> start() async {
+    startCount++;
+    return true;
+  }
 
   @override
-  Future<void> stop() async {}
+  Future<void> stop() async {
+    stopCount++;
+  }
 
   @override
   Future<void> dispose() async {}
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  SharedPreferences.setMockInitialValues({});
+
   test('playback cursor maps elapsed time across 4/4 measures', () {
     const composition = Composition(
       clef: ClefType.treble,
@@ -124,6 +136,57 @@ void main() {
         (note) => note.durationTicks,
       ),
       [480, 720, 240, 480],
+    );
+  });
+
+  test('moving the recording cursor keeps the microphone active', () async {
+    final microphone = FakeMicrophoneService();
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: microphone,
+    );
+    engine.rawEvents.addAll([
+      rawEvent(60, 500),
+      rawEvent(62, 500),
+      rawEvent(64, 500),
+    ]);
+    await engine.initialize();
+
+    engine.beginPunchInAt(480);
+    engine.beginPunchInAt(960);
+
+    expect(engine.isPunchingIn, isTrue);
+    expect(engine.notationCursorTick.value, 960);
+    expect(engine.microphoneStatus.value, MicrophoneStatus.listening);
+    expect(microphone.startCount, 1);
+    expect(microphone.stopCount, 0);
+
+    await engine.dispose();
+  });
+
+  test('reselecting a note in capture mode never divides it', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.rawEvents.addAll([rawEvent(60, 2000), rawEvent(62, 500)]);
+
+    // Taps can land at different positions within the rendered whole note.
+    // They should all select its beginning without altering its duration.
+    engine.beginPunchInAt(1500);
+    engine.beginPunchInAt(960);
+    engine.beginPunchInAt(240);
+
+    expect(engine.notationCursorTick.value, 0);
+    expect(engine.rawEvents, hasLength(2));
+    expect(engine.rawEvents.first.durationMs, 2000);
+    expect(
+      engine.composition.value.measures.first.notes
+          .where((note) => note.midiPitch == 60)
+          .map((note) => note.durationTicks),
+      [1920],
     );
   });
 

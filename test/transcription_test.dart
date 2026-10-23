@@ -123,6 +123,47 @@ void main() {
     );
   });
 
+  test('automatic ties appear only across a measure boundary', () {
+    final measures = const MeasureBuilder().build(
+      [
+        event(0, 750),
+        event(750, 375),
+        event(1125, 250),
+        event(1375, 2000, midi: 62),
+      ],
+      120,
+      4,
+    );
+
+    final firstMeasurePitch = measures.first.notes
+        .where((note) => note.midiPitch == 62)
+        .toList();
+    final secondMeasurePitch = measures[1].notes
+        .where((note) => note.midiPitch == 62)
+        .toList();
+
+    // The long captured note is decomposed on each side of the barline, but
+    // only the two fragments touching the barline should carry a tie.
+    expect(firstMeasurePitch, hasLength(2));
+    expect(firstMeasurePitch.first.tieToNext, isFalse);
+    expect(firstMeasurePitch.last.tieToNext, isTrue);
+    expect(secondMeasurePitch, hasLength(2));
+    expect(secondMeasurePitch.first.tieFromPrevious, isTrue);
+    expect(secondMeasurePitch.first.tieToNext, isFalse);
+    expect(secondMeasurePitch.last.tieFromPrevious, isFalse);
+  });
+
+  test('manual ties between events are preserved within a measure', () {
+    final measures = const MeasureBuilder().build(
+      [event(0, 500).copyWith(tieToNext: true), event(500, 500)],
+      120,
+      4,
+    );
+
+    expect(measures.single.notes.first.tieToNext, isTrue);
+    expect(measures.single.notes.last.tieFromPrevious, isTrue);
+  });
+
   test('accidentals reset at the next measure', () {
     final measures = const MeasureBuilder().build(
       [

@@ -26,15 +26,30 @@ class MeasureBuilder {
           sourceEventIndex > 0 && events[sourceEventIndex - 1].tieToNext;
       var remaining = quantizer.quantizeDuration(event.durationMs, tempoBpm);
       var firstPart = true;
+      var continuesFromPreviousMeasure = false;
       while (remaining > 0) {
         if (cursor == capacity) {
           measureIndex++;
           cursor = 0;
           notesByMeasure.add([]);
+          continuesFromPreviousMeasure = !firstPart;
         }
         final available = capacity - cursor;
         final measurePart = remaining < available ? remaining : available;
-        for (final duration in _decomposeDuration(measurePart)) {
+        final durations = _decomposeDuration(measurePart);
+        for (final indexedDuration in durations.indexed) {
+          final (durationIndex, duration) = indexedDuration;
+          final firstDurationInMeasurePart = durationIndex == 0;
+          final lastDurationInMeasurePart =
+              durationIndex == durations.length - 1;
+          final crossesBarline =
+              lastDurationInMeasurePart && remaining > measurePart;
+          final startsAfterBarline =
+              firstDurationInMeasurePart && continuesFromPreviousMeasure;
+          final manuallyTiedToNextEvent =
+              lastDurationInMeasurePart &&
+              remaining == measurePart &&
+              event.tieToNext;
           notesByMeasure[measureIndex].add(
             MusicalNote(
               // Octave-clef markings describe sounding pitch relative to the
@@ -63,17 +78,17 @@ class MeasureBuilder {
                           ))),
               isRest: event.isRest,
               tieFromPrevious:
-                  !event.isRest && (!firstPart || tiedFromPrevious),
-              tieToNext:
                   !event.isRest &&
-                  (remaining > duration ||
-                      (remaining == duration && event.tieToNext)),
+                  ((firstPart && tiedFromPrevious) || startsAfterBarline),
+              tieToNext:
+                  !event.isRest && (crossesBarline || manuallyTiedToNextEvent),
             ),
           );
           cursor += duration;
           remaining -= duration;
           firstPart = false;
         }
+        continuesFromPreviousMeasure = false;
       }
     }
     if (cursor == capacity) {
