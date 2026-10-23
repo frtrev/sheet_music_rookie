@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:xml/xml.dart';
 
 import '../models/composition.dart';
 import '../models/musical_note.dart';
@@ -152,6 +154,231 @@ class CompositionStorageService {
       rawEvents: rawEvents,
       modifiedAt: encodedDate ?? stat.modified,
     );
+  }
+
+  /// Imports either an uncompressed MusicXML document or an MXL container.
+  /// Files saved by this app use their lossless editor metadata; ordinary
+  /// MusicXML scores are converted into the app's monophonic event model.
+  Future<SavedComposition> importFile(String path) async {
+    final file = File(path);
+    final bytes = await file.readAsBytes();
+    if (bytes.length >= 2 && bytes[0] == 0x50 && bytes[1] == 0x4b) {
+      final archive = ZipDecoder().decodeBytes(bytes);
+      if (archive.findFile(_appDataPath) != null) {
+        return load(path);
+      }
+      final scoreFile = _scoreFileIn(archive);
+      if (scoreFile == null) {
+        throw const FormatException('No MusicXML score was found in the MXL.');
+      }
+      return _importMusicXml(
+        utf8.decode(scoreFile.content),
+        path,
+        await file.stat(),
+      );
+    }
+    return _importMusicXml(utf8.decode(bytes), path, await file.stat());
+  }
+
+  ArchiveFile? _scoreFileIn(Archive archive) {
+    final container = archive.findFile('META-INF/container.xml');
+    if (container != null) {
+      final document = XmlDocument.parse(utf8.decode(container.content));
+      final rootfile = document.findAllElements('rootfile').firstOrNull;
+      final fullPath = rootfile?.getAttribute('full-path');
+      if (fullPath != null) return archive.findFile(fullPath);
+    }
+    for (final file in archive.files) {
+      final name = file.name.toLowerCase();
+      if (file.isFile &&
+          !name.startsWith('meta-inf/') &&
+          (name.endsWith('.musicxml') || name.endsWith('.xml'))) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  SavedComposition _importMusicXml(String source, String path, FileStat stat) {
+    final document = XmlDocument.parse(source);
+    if (document.rootElement.name.local != 'score-partwise') {
+      throw const FormatException(
+        'Only partwise MusicXML scores are supported.',
+      );
+    }
+    final part = document.findAllElements('part').firstOrNull;
+    if (part == null) {
+      throw const FormatException('The score has no music part.');
+    }
+
+    final notes = part.findAllElements('note').toList();
+    final primaryVoice = notes
+        .map((note) => note.getElement('voice')?.innerText.trim())
+        .whereType<String>()
+        .where((voice) => voice.isNotEmpty)
+        .fold<String?>(null, (current, voice) {
+          if (voice == '1') return '1';
+          return current ?? voice;
+        });
+    var divisions = 1;
+    var beats = 4;
+    var beatUnit = 4;
+    var tempo = 120;
+    var clef = ClefType.treble;
+    var keySignature = KeySignature.cMajor;
+
+    final divisionsText = document.findAllElements('divisions').firstOrNull;
+    divisions = _positiveInt(divisionsText?.innerText, fallback: divisions);
+    final beatsText = document.findAllElements('beats').firstOrNull;
+    beats = _positiveInt(beatsText?.innerText, fallback: beats);
+    final beatTypeText = document.findAllElements('beat-type').firstOrNull;
+    beatUnit = _positiveInt(beatTypeText?.innerText, fallback: beatUnit);
+    final fifthsText = document.findAllElements('fifths').firstOrNull;
+    final fifths = int.tryParse(fifthsText?.innerText.trim() ?? '') ?? 0;
+    keySignature = KeySignature.values.firstWhere(
+      (key) => key.accidentalCount == fifths.clamp(-7, 7),
+    );
+    final clefSign = document
+        .findAllElements('clef')
+        .firstOrNull
+        ?.getElement('sign')
+        ?.innerText
+        .trim()
+        .toUpperCase();
+    if (clefSign == 'F') clef = ClefType.bass;
+    final soundTempo = document
+        .findAllElements('sound')
+        .map((element) => double.tryParse(element.getAttribute('tempo') ?? ''))
+        .whereType<double>()
+        .firstOrNull;
+    final metronomeTempo = double.tryParse(
+      document.findAllElements('per-minute').firstOrNull?.innerText.trim() ??
+          '',
+    );
+    tempo = ((soundTempo ?? metronomeTempo ?? tempo).round()).clamp(20, 400);
+
+    final rawEvents = <RawNoteEvent>[];
+    var timestampMs = 0;
+    for (final note in notes) {
+      if (note.getElement('chord') != null ||
+          note.getElement('grace') != null) {
+        continue;
+      }
+      final voice = note.getElement('voice')?.innerText.trim();
+      if (primaryVoice != null && voice != null && voice != primaryVoice) {
+        continue;
+      }
+      final durationUnits = int.tryParse(
+        note.getElement('duration')?.innerText.trim() ?? '',
+      );
+      if (durationUnits == null || durationUnits <= 0) continue;
+      final ticks = (durationUnits * 480 / divisions).round().clamp(1, 7680);
+      final durationMs = (ticks * 60000 / (tempo * 480)).round().clamp(
+        1,
+        60000,
+      );
+      final isRest = note.getElement('rest') != null;
+      var midi = 0;
+      var frequency = 0.0;
+      if (!isRest) {
+        final pitch = note.getElement('pitch');
+        final step = pitch?.getElement('step')?.innerText.trim().toUpperCase();
+        final octave = int.tryParse(
+          pitch?.getElement('octave')?.innerText.trim() ?? '',
+        );
+        if (step == null || octave == null) continue;
+        const naturalPitchClass = {
+          'C': 0,
+          'D': 2,
+          'E': 4,
+          'F': 5,
+          'G': 7,
+          'A': 9,
+          'B': 11,
+        };
+        final natural = naturalPitchClass[step];
+        if (natural == null) continue;
+        final alter = double.tryParse(
+          pitch?.getElement('alter')?.innerText.trim() ?? '0',
+        );
+        midi = ((octave + 1) * 12 + natural + (alter ?? 0).round()).clamp(
+          0,
+          127,
+        );
+        frequency = (440 * math.pow(2, (midi - 69) / 12)).toDouble();
+      }
+      final accidentalText = note
+          .getElement('accidental')
+          ?.innerText
+          .trim()
+          .toLowerCase();
+      final accidental = switch (accidentalText) {
+        'sharp' => NoteAccidental.sharp,
+        'flat' => NoteAccidental.flat,
+        'natural' => NoteAccidental.natural,
+        _ => isRest ? NoteAccidental.none : NoteAccidental.automatic,
+      };
+      final tieToNext = note
+          .findElements('tie')
+          .any((tie) => tie.getAttribute('type') == 'start');
+      rawEvents.add(
+        RawNoteEvent(
+          startTimeMs: timestampMs,
+          endTimeMs: timestampMs + durationMs,
+          frequencyHz: frequency,
+          midiPitch: midi,
+          confidence: 1,
+          accidental: accidental,
+          isRest: isRest,
+          tieToNext: !isRest && tieToNext,
+        ),
+      );
+      timestampMs += durationMs;
+    }
+    if (rawEvents.isEmpty) {
+      throw const FormatException('The score contains no supported notes.');
+    }
+
+    final title =
+        document.findAllElements('work-title').firstOrNull?.innerText.trim() ??
+        document
+            .findAllElements('movement-title')
+            .firstOrNull
+            ?.innerText
+            .trim();
+    final fallbackTitle = path
+        .split(Platform.pathSeparator)
+        .last
+        .replaceFirst(
+          RegExp(r'\.(mxl|musicxml|xml)$', caseSensitive: false),
+          '',
+        );
+    final composition = Composition(
+      title: title == null || title.isEmpty ? fallbackTitle : title,
+      keySignature: keySignature,
+      beatsPerMeasure: beats,
+      beatUnit: beatUnit,
+      tempoBpm: tempo,
+      clef: clef,
+      microphoneActive: false,
+      measures: const MeasureBuilder().build(
+        rawEvents,
+        tempo,
+        beats,
+        keySignature: keySignature,
+      ),
+    );
+    return SavedComposition(
+      path: path,
+      composition: composition,
+      rawEvents: rawEvents,
+      modifiedAt: stat.modified,
+    );
+  }
+
+  int _positiveInt(String? value, {required int fallback}) {
+    final parsed = int.tryParse(value?.trim() ?? '');
+    return parsed == null || parsed <= 0 ? fallback : parsed;
   }
 
   Future<Directory> _storageDirectory() async {

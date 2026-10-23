@@ -131,4 +131,79 @@ void main() {
     expect(listed, hasLength(1));
     expect(listed.single.composition.title, 'Revised');
   });
+
+  test('imports a standard uncompressed MusicXML score', () async {
+    final root = await Directory.systemTemp.createTemp('rookie-xml-import-');
+    addTearDown(() => root.delete(recursive: true));
+    final file = File('${root.path}/external.musicxml');
+    await file.writeAsString(_externalMusicXml);
+    final service = CompositionStorageService(
+      documentsDirectory: () async => root,
+    );
+
+    final imported = await service.importFile(file.path);
+
+    expect(imported.composition.title, 'Imported Waltz');
+    expect(imported.composition.clef, ClefType.bass);
+    expect(imported.composition.keySignature, KeySignature.fMajor);
+    expect(imported.composition.beatsPerMeasure, 3);
+    expect(imported.composition.beatUnit, 4);
+    expect(imported.composition.tempoBpm, 90);
+    expect(imported.rawEvents, hasLength(4));
+    expect(imported.rawEvents.first.midiPitch, 58);
+    expect(imported.rawEvents[1].isRest, isTrue);
+    expect(imported.rawEvents[2].accidental, NoteAccidental.natural);
+    expect(imported.rawEvents[2].tieToNext, isTrue);
+  });
+
+  test(
+    'finds and imports the root score in a standard MXL container',
+    () async {
+      final root = await Directory.systemTemp.createTemp('rookie-mxl-import-');
+      addTearDown(() => root.delete(recursive: true));
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string('META-INF/container.xml', '''<?xml version="1.0"?>
+<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles><rootfile full-path="scores/main.musicxml"/></rootfiles>
+</container>'''),
+        )
+        ..addFile(
+          ArchiveFile.string('scores/main.musicxml', _externalMusicXml),
+        );
+      final file = File('${root.path}/external.mxl');
+      await file.writeAsBytes(ZipEncoder().encodeBytes(archive));
+      final service = CompositionStorageService(
+        documentsDirectory: () async => root,
+      );
+
+      final imported = await service.importFile(file.path);
+
+      expect(imported.composition.title, 'Imported Waltz');
+      expect(imported.rawEvents.first.midiPitch, 58);
+    },
+  );
 }
+
+const _externalMusicXml = '''<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <work><work-title>Imported Waltz</work-title></work>
+  <part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>2</divisions>
+        <key><fifths>-1</fifths></key>
+        <time><beats>3</beats><beat-type>4</beat-type></time>
+        <clef><sign>F</sign><line>4</line></clef>
+      </attributes>
+      <direction><sound tempo="90"/></direction>
+      <note><pitch><step>B</step><alter>-1</alter><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type></note>
+      <note><rest/><duration>1</duration><voice>1</voice><type>eighth</type></note>
+      <note><pitch><step>B</step><octave>3</octave></pitch><duration>3</duration><voice>1</voice><type>quarter</type><dot/><accidental>natural</accidental><tie type="start"/></note>
+    </measure>
+    <measure number="2">
+      <note><pitch><step>B</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice><type>quarter</type><tie type="stop"/></note>
+    </measure>
+  </part>
+</score-partwise>''';
