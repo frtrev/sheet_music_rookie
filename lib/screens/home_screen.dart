@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/composition.dart';
 import '../services/composition_storage_service.dart';
@@ -182,6 +183,13 @@ class HomeScreen extends StatelessWidget {
                 subtitle: Text(
                   '${item.composition.keySignature.name} • $dateLabel',
                 ),
+                trailing: Builder(
+                  builder: (shareContext) => IconButton(
+                    onPressed: () => _shareSaved(shareContext, item),
+                    icon: const Icon(Icons.ios_share_rounded),
+                    tooltip: 'Share ${item.composition.title}',
+                  ),
+                ),
                 onTap: () => Navigator.pop(context, item),
               );
             },
@@ -208,6 +216,30 @@ class HomeScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _shareSaved(BuildContext context, SavedComposition item) async {
+    final box = context.findRenderObject() as RenderBox?;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [
+            XFile(item.path, mimeType: 'application/vnd.recordare.musicxml'),
+          ],
+          title: item.composition.title,
+          subject: '${item.composition.title}.mxl',
+          sharePositionOrigin: box == null
+              ? null
+              : box.localToGlobal(Offset.zero) & box.size,
+        ),
+      );
+    } on Object {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('The composition could not be shared.')),
+        );
+      }
+    }
   }
 
   Future<OctaveRange?> _chooseRange(BuildContext context) {

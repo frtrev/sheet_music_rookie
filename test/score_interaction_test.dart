@@ -151,7 +151,7 @@ void main() {
       rawEvent(62, 500),
       rawEvent(64, 500),
     ]);
-    await engine.initialize();
+    await engine.initialize(autoStart: true);
 
     engine.beginPunchInAt(480);
     engine.beginPunchInAt(960);
@@ -162,6 +162,22 @@ void main() {
     expect(microphone.startCount, 1);
     expect(microphone.stopCount, 0);
 
+    await engine.dispose();
+  });
+
+  test('initializing the editor leaves every transport idle', () async {
+    final microphone = FakeMicrophoneService();
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: microphone,
+    );
+
+    await engine.initialize();
+
+    expect(engine.microphoneStatus.value, MicrophoneStatus.paused);
+    expect(engine.composition.value.microphoneActive, isFalse);
+    expect(microphone.startCount, 0);
     await engine.dispose();
   });
 
@@ -372,5 +388,82 @@ void main() {
     engine.toggleRestAtTick(0);
     expect(engine.canToggleTieAtTick(0), isFalse);
     expect(engine.toggleTieAtTick(0), isNull);
+  });
+
+  test('removing a selected tied note removes its complete musical group', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [
+      rawEvent(60, 500),
+      rawEvent(62, 500),
+      rawEvent(64, 500),
+    ]);
+    engine.toggleTieAtTick(0);
+
+    expect(engine.removeNoteAtTick(480), isTrue);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [64]);
+    expect(engine.notationCursorTick.value, 0);
+    expect(engine.removeNoteAtTick(960), isFalse);
+  });
+
+  test('inserting a measure uses the bar boundary instead of cursor tick', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [
+      for (var index = 0; index < 8; index++) rawEvent(60 + index, 500),
+    ]);
+    engine.notationCursorTick.value = 600;
+
+    expect(engine.insertMeasureAfterTick(600), 1920);
+    expect(engine.notationCursorTick.value, 600);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [
+      60,
+      61,
+      62,
+      63,
+      0,
+      64,
+      65,
+      66,
+      67,
+    ]);
+    expect(engine.rawEvents[4].isRest, isTrue);
+    expect(engine.rawEvents[4].durationMs, 2000);
+    expect(
+      engine.composition.value.measures[1].notes.single.durationTicks,
+      1920,
+    );
+    expect(engine.composition.value.measures[2].notes.first.midiPitch, 64);
+  });
+
+  test('inserting after a partial measure fills it before the blank bar', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 500)]);
+
+    engine.insertMeasureAfterTick(0);
+
+    expect(
+      engine.composition.value.measures[0].notes.fold<int>(
+        0,
+        (sum, note) => sum + note.durationTicks,
+      ),
+      1920,
+    );
+    expect(
+      engine.composition.value.measures[1].notes.single,
+      isA<MusicalNote>()
+          .having((note) => note.isRest, 'isRest', isTrue)
+          .having((note) => note.durationTicks, 'durationTicks', 1920),
+    );
   });
 }

@@ -46,7 +46,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   final CompositionStorageService _storage = CompositionStorageService();
   final ScrollController _scoreScroll = ScrollController();
   final ScrollController _pageScroll = ScrollController();
-  bool _pausedByUser = false;
+  bool _pausedByUser = true;
   bool _settingsExpanded = false;
   bool _resumeListeningAfterPlayback = false;
   bool _cursorScrollScheduled = false;
@@ -741,6 +741,36 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.notationCursorTick.value = selectedTick;
   }
 
+  Future<void> _removeSelectedNote() async {
+    if (_practiceActive) await _stopPractice();
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = selectedTick;
+    _engine.removeNoteAtTick(selectedTick);
+  }
+
+  Future<void> _insertMeasure() async {
+    if (_practiceActive) await _stopPractice();
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.notationCursorTick.value = selectedTick;
+    _engine.insertMeasureAfterTick(selectedTick);
+  }
+
   Future<void> _playEditedPreview({
     required int midiPitch,
     required int durationTicks,
@@ -956,6 +986,31 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               ),
             ),
             const SizedBox(height: 12),
+            ValueListenableBuilder<Composition>(
+              valueListenable: _engine.composition,
+              builder: (context, _, _) => ValueListenableBuilder<int>(
+                valueListenable: _engine.notationCursorTick,
+                builder: (context, cursorTick, _) => _NoteEditControls(
+                  hasEvent: _engine.eventIndexAtTick(cursorTick) != null,
+                  isRest: _engine.isRestAtTick(cursorTick),
+                  canToggleRest: _engine.canToggleRestAtTick(cursorTick),
+                  canToggleTie: _engine.canToggleTieAtTick(cursorTick),
+                  isTied: _engine.isTiedAtTick(cursorTick),
+                  onPitchUp: () => unawaited(_editSelectedNote(pitchDelta: 1)),
+                  onPitchDown: () =>
+                      unawaited(_editSelectedNote(pitchDelta: -1)),
+                  onShorter: () =>
+                      unawaited(_editSelectedNote(durationDelta: -1)),
+                  onLonger: () =>
+                      unawaited(_editSelectedNote(durationDelta: 1)),
+                  onToggleRest: () => unawaited(_toggleSelectedRest()),
+                  onToggleTie: () => unawaited(_toggleSelectedTie()),
+                  onRemove: () => unawaited(_removeSelectedNote()),
+                  onInsertMeasure: () => unawaited(_insertMeasure()),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             ValueListenableBuilder<MicrophoneStatus>(
               valueListenable: _engine.microphoneStatus,
               builder: (context, status, _) => ValueListenableBuilder<bool>(
@@ -981,29 +1036,6 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                     onPractice: () => unawaited(_togglePractice()),
                   );
                 },
-              ),
-            ),
-            const SizedBox(height: 10),
-            ValueListenableBuilder<Composition>(
-              valueListenable: _engine.composition,
-              builder: (context, _, _) => ValueListenableBuilder<int>(
-                valueListenable: _engine.notationCursorTick,
-                builder: (context, cursorTick, _) => _NoteEditControls(
-                  hasEvent: _engine.eventIndexAtTick(cursorTick) != null,
-                  isRest: _engine.isRestAtTick(cursorTick),
-                  canToggleRest: _engine.canToggleRestAtTick(cursorTick),
-                  canToggleTie: _engine.canToggleTieAtTick(cursorTick),
-                  isTied: _engine.isTiedAtTick(cursorTick),
-                  onPitchUp: () => unawaited(_editSelectedNote(pitchDelta: 1)),
-                  onPitchDown: () =>
-                      unawaited(_editSelectedNote(pitchDelta: -1)),
-                  onShorter: () =>
-                      unawaited(_editSelectedNote(durationDelta: -1)),
-                  onLonger: () =>
-                      unawaited(_editSelectedNote(durationDelta: 1)),
-                  onToggleRest: () => unawaited(_toggleSelectedRest()),
-                  onToggleTie: () => unawaited(_toggleSelectedTie()),
-                ),
               ),
             ),
             const SizedBox(height: 6),
@@ -1275,6 +1307,8 @@ class _NoteEditControls extends StatelessWidget {
     required this.onLonger,
     required this.onToggleRest,
     required this.onToggleTie,
+    required this.onRemove,
+    required this.onInsertMeasure,
   });
 
   final bool hasEvent;
@@ -1288,68 +1322,82 @@ class _NoteEditControls extends StatelessWidget {
   final VoidCallback onLonger;
   final VoidCallback onToggleRest;
   final VoidCallback onToggleTie;
+  final VoidCallback onRemove;
+  final VoidCallback onInsertMeasure;
 
   @override
   Widget build(BuildContext context) => Card(
     margin: EdgeInsets.zero,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              hasEvent
-                  ? (isRest ? 'Selected rest' : 'Selected note')
-                  : 'Insert rest',
-              style: const TextStyle(fontWeight: FontWeight.w600),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: hasEvent && !isRest ? onPitchDown : null,
+              icon: const Icon(Icons.arrow_downward),
+              tooltip: 'Down one semitone',
             ),
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: hasEvent && !isRest ? onPitchDown : null,
-            icon: const Icon(Icons.arrow_downward),
-            tooltip: 'Down one semitone',
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: hasEvent && !isRest ? onPitchUp : null,
-            icon: const Icon(Icons.arrow_upward),
-            tooltip: 'Up one semitone',
-          ),
-          const SizedBox(height: 28, child: VerticalDivider(width: 12)),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: hasEvent ? onShorter : null,
-            icon: const Icon(Icons.arrow_back),
-            tooltip: 'Shorter note',
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: hasEvent ? onLonger : null,
-            icon: const Icon(Icons.arrow_forward),
-            tooltip: 'Longer note',
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: canToggleRest ? onToggleRest : null,
-            icon: isRest
-                ? const Icon(Icons.music_note)
-                : const RestSymbolIcon(size: 23),
-            tooltip: isRest ? 'Change to first-line note' : 'Change to rest',
-          ),
-          IconButton(
-            constraints: const BoxConstraints.tightFor(width: 42, height: 44),
-            padding: EdgeInsets.zero,
-            onPressed: canToggleTie || isTied ? onToggleTie : null,
-            icon: Icon(isTied ? Icons.link_off : Icons.link),
-            tooltip: isTied ? 'Remove tie' : 'Tie to next note',
-          ),
-        ],
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: hasEvent && !isRest ? onPitchUp : null,
+              icon: const Icon(Icons.arrow_upward),
+              tooltip: 'Up one semitone',
+            ),
+            const SizedBox(height: 28, child: VerticalDivider(width: 12)),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: hasEvent ? onShorter : null,
+              icon: const Icon(Icons.arrow_back),
+              tooltip: 'Shorter note',
+            ),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: hasEvent ? onLonger : null,
+              icon: const Icon(Icons.arrow_forward),
+              tooltip: 'Longer note',
+            ),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: canToggleRest ? onToggleRest : null,
+              icon: isRest
+                  ? const Icon(Icons.music_note)
+                  : const RestSymbolIcon(size: 23),
+              tooltip: isRest ? 'Change to first-line note' : 'Change to rest',
+            ),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: canToggleTie || isTied ? onToggleTie : null,
+              icon: Icon(isTied ? Icons.link_off : Icons.link),
+              tooltip: isTied ? 'Remove tie' : 'Tie to next note',
+            ),
+            const SizedBox(height: 28, child: VerticalDivider(width: 12)),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: hasEvent ? onRemove : null,
+              icon: const Icon(Icons.close_rounded),
+              color: Theme.of(context).colorScheme.error,
+              tooltip: 'Remove selected note or rest',
+            ),
+            IconButton(
+              constraints: const BoxConstraints.tightFor(width: 40, height: 44),
+              padding: EdgeInsets.zero,
+              onPressed: onInsertMeasure,
+              icon: const Icon(Icons.add_box_outlined),
+              tooltip: 'Insert blank measure after current measure',
+            ),
+          ],
+        ),
       ),
     ),
   );

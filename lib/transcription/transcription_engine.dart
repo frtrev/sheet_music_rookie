@@ -49,7 +49,7 @@ class TranscriptionEngine {
   bool _captureEnabled = true;
 
   final ValueNotifier<MicrophoneStatus> microphoneStatus = ValueNotifier(
-    MicrophoneStatus.starting,
+    MicrophoneStatus.paused,
   );
   final ValueNotifier<PitchDetectionResult?> livePitch = ValueNotifier(null);
   final ValueNotifier<int> currentNoteDurationMs = ValueNotifier(0);
@@ -73,9 +73,9 @@ class TranscriptionEngine {
     _rebuildComposition();
   }
 
-  Future<void> initialize() async {
+  Future<void> initialize({bool autoStart = false}) async {
     settings.value = await _settingsService.load();
-    await startListening();
+    if (autoStart) await startListening();
   }
 
   Future<void> startListening() async {
@@ -281,6 +281,112 @@ class TranscriptionEngine {
     _normalizeTiedGroupPitch(index);
     _rebuildComposition();
     return true;
+  }
+
+  bool removeNoteAtTick(int tick) {
+    if (isPunchingIn) _finishPunchIn();
+    final index = eventIndexAtTick(tick);
+    if (index == null) return false;
+    final (groupStart, groupEnd) = _tiedGroupBounds(index);
+    final startTick = _totalTicks(rawEvents.sublist(0, groupStart));
+    rawEvents.removeRange(groupStart, groupEnd + 1);
+    notationCursorTick.value = startTick.clamp(0, _totalTicks(rawEvents));
+    _rebuildComposition();
+    return true;
+  }
+
+  /// Inserts one complete silent measure after the measure containing [tick].
+  /// The cursor's exact position is intentionally ignored so notes are never
+  /// split except at the measure boundary itself.
+  int insertMeasureAfterTick(int tick) {
+    if (isPunchingIn) _finishPunchIn();
+    final capacity = composition.value.beatsPerMeasure * 480;
+    final totalTicks = _totalTicks(rawEvents);
+    final editableEnd = math.max(
+      capacity,
+      composition.value.measures.length * capacity,
+    );
+    final boundedTick = tick.clamp(0, editableEnd).toInt();
+    var measureIndex = boundedTick ~/ capacity;
+    if (boundedTick > 0 &&
+        boundedTick % capacity == 0 &&
+        eventIndexAtTick(boundedTick) == null) {
+      measureIndex--;
+    }
+    final insertionTick = (measureIndex + 1) * capacity;
+    final splitTick = math.min(insertionTick, totalTicks);
+    final before = <({RawNoteEvent event, int ticks})>[];
+    final after = <({RawNoteEvent event, int ticks})>[];
+    var position = 0;
+    for (final event in rawEvents) {
+      final eventTicks = _ticksFor(event);
+      final end = position + eventTicks;
+      if (end <= splitTick) {
+        before.add((event: event, ticks: eventTicks));
+      } else if (position >= splitTick) {
+        after.add((event: event, ticks: eventTicks));
+      } else {
+        before.add((
+          event: event.copyWith(tieToNext: false),
+          ticks: splitTick - position,
+        ));
+        after.add((event: event, ticks: end - splitTick));
+      }
+      position = end;
+    }
+    if (before.isNotEmpty && before.last.event.tieToNext) {
+      final last = before.removeLast();
+      before.add((
+        event: last.event.copyWith(tieToNext: false),
+        ticks: last.ticks,
+      ));
+    }
+
+    final silenceBeforeMeasure = insertionTick - splitTick;
+    final pieces = <({RawNoteEvent event, int ticks})>[
+      ...before,
+      ..._restPieces(silenceBeforeMeasure),
+      ..._restPieces(capacity),
+      ...after,
+    ];
+    _replaceWithPieces(pieces);
+    notationCursorTick.value = boundedTick;
+    _rebuildComposition();
+    return insertionTick;
+  }
+
+  List<({RawNoteEvent event, int ticks})> _restPieces(int ticks) {
+    final pieces = <({RawNoteEvent event, int ticks})>[];
+    var remaining = ticks;
+    for (final value in NoteValue.values.reversed) {
+      while (remaining >= value.ticks) {
+        pieces.add((
+          event: const RawNoteEvent(
+            startTimeMs: 0,
+            endTimeMs: 0,
+            frequencyHz: 0,
+            midiPitch: 0,
+            confidence: 1,
+            accidental: NoteAccidental.none,
+            isRest: true,
+          ),
+          ticks: value.ticks,
+        ));
+        remaining -= value.ticks;
+      }
+    }
+    assert(remaining == 0, 'Measure duration must align to the notation grid.');
+    return pieces;
+  }
+
+  void _replaceWithPieces(List<({RawNoteEvent event, int ticks})> pieces) {
+    var timestampMs = 0;
+    rawEvents.clear();
+    for (final piece in pieces) {
+      final event = _eventWithTicks(piece.event, piece.ticks, timestampMs);
+      rawEvents.add(event);
+      timestampMs = event.endTimeMs;
+    }
   }
 
   void _normalizeTiedGroupPitch(int index) {

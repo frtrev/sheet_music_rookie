@@ -13,11 +13,13 @@ flutter run
 
 Use a physical iPhone or Android device for voice testing. Simulators can verify navigation and rendering, but their microphone input is not representative of device capture.
 
-The editor requests microphone permission and starts listening automatically. If permission was previously denied, enable microphone access in the device's system settings and tap **Retry**.
+The editor opens idle. Press **Record** to capture notation or **Practice** to rehearse; either action requests microphone permission when needed. If permission was previously denied, enable microphone access in the device's system settings and tap **Retry**.
 
 Tap anywhere on the staff to place the shared score cursor. **Play** starts there, and **Record** punches in there: newly sung notes overwrite the same timeline span until silence is detected, later notes are retained, and the cursor lands where writing stopped. Repositioning the cursor during playback seeks immediately. Use **Insert Note** to choose a pitch, octave, and regular or dotted duration and place it at the cursor.
 
 Use **Practice** to rehearse without changing the composition. Practice starts at the beginning and moves the cursor to the next note after the expected sounding pitch is stable and has been held for at least 60% of the written duration. The fixed gauge on the score's left edge moves up for sharp tones and down for flat tones, changing from red to green as the detected pitch approaches the current note. Tied fragments count as one note and rests are skipped. Record, Play, and Practice are exclusive transports: starting one stops either of the others.
+
+Saved compositions have a share action in the **Open composition** list. It exports the compressed MusicXML (`.mxl`) file through the system share sheet, including Save to Files and Google Drive when available.
 
 Use the save button in the editor to name and store a composition locally. Scores are saved in the app's documents directory as compressed MusicXML (`.mxl`) archives, with a standard MusicXML 4.0 score plus private round-trip metadata for the editor. The **Open** button on the home screen lists saved scores and restores their notation and editable recording events. No cloud service or account is involved.
 

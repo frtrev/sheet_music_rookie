@@ -87,7 +87,7 @@ class Composition {
     this.metronomeMode = MetronomeMode.off,
     this.metronomeVolume = .55,
     this.playbackVolume = 1,
-    this.microphoneActive = true,
+    this.microphoneActive = false,
     this.measures = const [Measure(index: 0)],
   });
 
