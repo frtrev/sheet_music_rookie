@@ -84,8 +84,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   void _microphoneStatusChanged() {
     final status = _engine.microphoneStatus.value;
     if (_practiceActive && status != MicrophoneStatus.voiceDetected) {
-      _practiceSession?.process(null, voiceDetected: false);
-      _practiceProgress.value = 0;
+      final session = _practiceSession;
+      if (session != null) {
+        _syncPracticeSettings(session);
+        _applyPracticeUpdate(
+          session,
+          session.process(null, voiceDetected: false),
+        );
+      }
     }
     if (status == MicrophoneStatus.paused ||
         status == MicrophoneStatus.unavailable) {
@@ -114,12 +120,23 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (!_practiceActive) return;
     final session = _practiceSession;
     if (session == null) return;
-    session.pitchToleranceCents = _engine.settings.value.pitchToleranceCents;
+    _syncPracticeSettings(session);
     final update = session.process(
       _engine.livePitch.value,
       voiceDetected:
           _engine.microphoneStatus.value == MicrophoneStatus.voiceDetected,
     );
+    _applyPracticeUpdate(session, update);
+  }
+
+  void _syncPracticeSettings(PracticeSession session) {
+    final settings = _engine.settings.value;
+    session
+      ..pitchToleranceCents = settings.pitchToleranceCents
+      ..difficulty = settings.practiceDifficulty;
+  }
+
+  void _applyPracticeUpdate(PracticeSession session, PracticeUpdate? update) {
     _practiceProgress.value = session.progress;
     if (update == null) return;
     _engine.notationCursorTick.value = update.cursorTick;
@@ -375,6 +392,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _engine.composition.value,
       pitchStabilityMs: _engine.settings.value.pitchStabilityMs,
       pitchToleranceCents: _engine.settings.value.pitchToleranceCents,
+      difficulty: _engine.settings.value.practiceDifficulty,
     );
     if (!session.hasTargets) {
       if (mounted) {

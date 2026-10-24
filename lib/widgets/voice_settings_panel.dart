@@ -120,6 +120,29 @@ class VoiceSettingsPanel extends StatelessWidget {
           onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
         ),
         _SettingSlider(
+          label: 'Practice difficulty',
+          value: value.practiceDifficulty.index.toDouble(),
+          min: 0,
+          max: 2,
+          divisions: 2,
+          formatter: (v) => PracticeDifficulty.values[v.round()].label,
+          onChanged: (v) => onChanged(
+            value.copyWith(
+              practiceDifficulty: PracticeDifficulty.values[v.round()],
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              value.practiceDifficulty.description,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ),
+        _SettingSlider(
           label: 'Smoothing window',
           value: value.smoothingWindow.toDouble(),
           min: 1,

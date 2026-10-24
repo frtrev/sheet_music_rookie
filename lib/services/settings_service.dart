@@ -34,6 +34,11 @@ class SettingsService {
       pitchToleranceCents:
           prefs.getDouble('${_prefix}tolerance') ??
           defaults.pitchToleranceCents,
+      practiceDifficulty: PracticeDifficulty.values.firstWhere(
+        (value) =>
+            value.name == prefs.getString('${_prefix}practiceDifficulty'),
+        orElse: () => defaults.practiceDifficulty,
+      ),
       smoothingWindow:
           prefs.getInt('${_prefix}smoothing') ?? defaults.smoothingWindow,
     );
@@ -51,6 +56,10 @@ class SettingsService {
       prefs.setInt('${_prefix}silenceDuration', value.silenceDurationMs),
       prefs.setInt('${_prefix}articulationGap', value.articulationGapMs),
       prefs.setDouble('${_prefix}tolerance', value.pitchToleranceCents),
+      prefs.setString(
+        '${_prefix}practiceDifficulty',
+        value.practiceDifficulty.name,
+      ),
       prefs.setInt('${_prefix}smoothing', value.smoothingWindow),
     ]);
   }

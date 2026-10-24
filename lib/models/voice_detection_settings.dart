@@ -1,3 +1,13 @@
+enum PracticeDifficulty {
+  beginner('Beginner', 'Keeps earned progress when the pitch is missed.'),
+  medium('Medium', 'Resets progress for the current note.'),
+  advanced('Advanced', 'Returns to the beginning of the score.');
+
+  const PracticeDifficulty(this.label, this.description);
+  final String label;
+  final String description;
+}
+
 class VoiceDetectionSettings {
   const VoiceDetectionSettings({
     this.minimumFrequency = 65,
@@ -9,6 +19,7 @@ class VoiceDetectionSettings {
     this.silenceDurationMs = 180,
     this.articulationGapMs = 35,
     this.pitchToleranceCents = 45,
+    this.practiceDifficulty = PracticeDifficulty.beginner,
     this.smoothingWindow = 3,
   });
 
@@ -21,6 +32,7 @@ class VoiceDetectionSettings {
   final int silenceDurationMs;
   final int articulationGapMs;
   final double pitchToleranceCents;
+  final PracticeDifficulty practiceDifficulty;
   final int smoothingWindow;
 
   VoiceDetectionSettings copyWith({
@@ -33,6 +45,7 @@ class VoiceDetectionSettings {
     int? silenceDurationMs,
     int? articulationGapMs,
     double? pitchToleranceCents,
+    PracticeDifficulty? practiceDifficulty,
     int? smoothingWindow,
   }) {
     return VoiceDetectionSettings(
@@ -46,6 +59,7 @@ class VoiceDetectionSettings {
       silenceDurationMs: silenceDurationMs ?? this.silenceDurationMs,
       articulationGapMs: articulationGapMs ?? this.articulationGapMs,
       pitchToleranceCents: pitchToleranceCents ?? this.pitchToleranceCents,
+      practiceDifficulty: practiceDifficulty ?? this.practiceDifficulty,
       smoothingWindow: smoothingWindow ?? this.smoothingWindow,
     );
   }

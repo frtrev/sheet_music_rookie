@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../models/composition.dart';
 import '../models/pitch_detection_result.dart';
+import '../models/voice_detection_settings.dart';
 import 'score_playback_service.dart';
 
 class PracticeTarget {
@@ -40,16 +41,20 @@ class PracticeSession {
     this.composition, {
     required this.pitchStabilityMs,
     this.pitchToleranceCents = 45,
+    this.difficulty = PracticeDifficulty.beginner,
     this.requiredDurationFraction = .6,
   }) : targets = _targetsFor(composition);
 
   final Composition composition;
   final int pitchStabilityMs;
   double pitchToleranceCents;
+  PracticeDifficulty difficulty;
   final double requiredDurationFraction;
   final List<PracticeTarget> targets;
   int _targetIndex = 0;
   int? _correctPitchSinceMs;
+  int _heldMs = 0;
+  int _streakBaseMs = 0;
   double _progress = 0;
 
   bool get hasTargets => targets.isNotEmpty;
@@ -64,31 +69,59 @@ class PracticeSession {
     final target = currentTarget;
     if (target == null) return null;
     if (!voiceDetected || result == null || !_isPitchAccepted(result, target)) {
-      _correctPitchSinceMs = null;
-      _progress = 0;
-      return null;
+      return _handleMiss();
     }
 
-    _correctPitchSinceMs ??= result.timestampMs;
-    final heldMs = result.timestampMs - _correctPitchSinceMs!;
+    if (_correctPitchSinceMs == null) {
+      _correctPitchSinceMs = result.timestampMs;
+      _streakBaseMs = _heldMs;
+    }
+    _heldMs = _streakBaseMs + result.timestampMs - _correctPitchSinceMs!;
     final noteDurationMs =
         target.durationTicks * 60000 / (composition.tempoBpm * 480);
     final requiredMs = math.max(
       pitchStabilityMs,
       (noteDurationMs * requiredDurationFraction).round(),
     );
-    _progress = (heldMs / requiredMs).clamp(0.0, 1.0).toDouble();
-    if (heldMs < requiredMs) return null;
+    _progress = (_heldMs / requiredMs).clamp(0.0, 1.0).toDouble();
+    if (_heldMs < requiredMs) return null;
 
     _targetIndex++;
-    _correctPitchSinceMs = null;
-    _progress = 0;
+    _resetCurrentNote();
     return PracticeUpdate(
       cursorTick: completed
           ? _scoreEndTick(composition)
           : targets[_targetIndex].startTick,
       completed: completed,
     );
+  }
+
+  PracticeUpdate? _handleMiss() {
+    switch (difficulty) {
+      case PracticeDifficulty.beginner:
+        _correctPitchSinceMs = null;
+        _streakBaseMs = _heldMs;
+        return null;
+      case PracticeDifficulty.medium:
+        _resetCurrentNote();
+        return null;
+      case PracticeDifficulty.advanced:
+        final shouldMove = _targetIndex != 0 || _heldMs != 0 || _progress != 0;
+        _targetIndex = 0;
+        _resetCurrentNote();
+        if (!shouldMove || targets.isEmpty) return null;
+        return PracticeUpdate(
+          cursorTick: targets.first.startTick,
+          completed: false,
+        );
+    }
+  }
+
+  void _resetCurrentNote() {
+    _correctPitchSinceMs = null;
+    _heldMs = 0;
+    _streakBaseMs = 0;
+    _progress = 0;
   }
 
   bool _isPitchAccepted(PitchDetectionResult result, PracticeTarget target) {

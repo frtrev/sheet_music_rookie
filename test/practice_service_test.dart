@@ -5,6 +5,7 @@ import 'package:sheet_music_rookie/models/composition.dart';
 import 'package:sheet_music_rookie/models/measure.dart';
 import 'package:sheet_music_rookie/models/musical_note.dart';
 import 'package:sheet_music_rookie/models/pitch_detection_result.dart';
+import 'package:sheet_music_rookie/models/voice_detection_settings.dart';
 import 'package:sheet_music_rookie/services/practice_service.dart';
 
 PitchDetectionResult detected(int timestampMs, int midi) =>
@@ -98,7 +99,7 @@ void main() {
       expect(advanced?.completed, isFalse);
       expect(session.progress, 0);
 
-      // A wrong pitch resets the hold timer for the next target.
+      // A wrong pitch does not earn time for the next target.
       expect(session.process(detected(700, 71), voiceDetected: true), isNull);
       expect(session.progress, 0);
       expect(session.process(detected(800, 72), voiceDetected: true), isNull);
@@ -111,7 +112,7 @@ void main() {
     },
   );
 
-  test('silence resets practice pitch stability', () {
+  test('silence does not count toward beginner practice progress', () {
     const composition = Composition(
       clef: ClefType.treble,
       tempoBpm: 120,
@@ -168,5 +169,74 @@ void main() {
           ?.completed,
       isTrue,
     );
+  });
+
+  test('beginner keeps progress, medium resets, and advanced restarts', () {
+    const oneNote = Composition(
+      clef: ClefType.treble,
+      tempoBpm: 120,
+      measures: [
+        Measure(
+          index: 0,
+          notes: [MusicalNote(midiPitch: 69, startTick: 0, durationTicks: 480)],
+        ),
+      ],
+    );
+    final beginner = PracticeSession(
+      oneNote,
+      pitchStabilityMs: 100,
+      requiredDurationFraction: .6,
+    );
+    beginner.process(detected(0, 69), voiceDetected: true);
+    beginner.process(detected(150, 69), voiceDetected: true);
+    expect(beginner.progress, .5);
+    beginner.process(detected(200, 67), voiceDetected: true);
+    expect(beginner.progress, .5);
+    beginner.process(detected(300, 69), voiceDetected: true);
+    expect(
+      beginner.process(detected(450, 69), voiceDetected: true)?.completed,
+      isTrue,
+    );
+
+    final medium = PracticeSession(
+      oneNote,
+      pitchStabilityMs: 100,
+      difficulty: PracticeDifficulty.medium,
+      requiredDurationFraction: .6,
+    );
+    medium.process(detected(0, 69), voiceDetected: true);
+    medium.process(detected(150, 69), voiceDetected: true);
+    expect(medium.progress, .5);
+    medium.process(detected(200, 67), voiceDetected: true);
+    expect(medium.progress, 0);
+
+    const twoNotes = Composition(
+      clef: ClefType.treble,
+      tempoBpm: 120,
+      measures: [
+        Measure(
+          index: 0,
+          notes: [
+            MusicalNote(midiPitch: 69, startTick: 0, durationTicks: 480),
+            MusicalNote(midiPitch: 71, startTick: 480, durationTicks: 480),
+          ],
+        ),
+      ],
+    );
+    final advanced = PracticeSession(
+      twoNotes,
+      pitchStabilityMs: 100,
+      difficulty: PracticeDifficulty.advanced,
+      requiredDurationFraction: .1,
+    );
+    advanced.process(detected(0, 69), voiceDetected: true);
+    expect(
+      advanced.process(detected(100, 69), voiceDetected: true)?.cursorTick,
+      480,
+    );
+    final restarted = advanced.process(detected(200, 69), voiceDetected: true);
+    expect(restarted?.cursorTick, 0);
+    expect(advanced.currentTarget?.soundingMidiPitch, 69);
+    expect(advanced.progress, 0);
   });
 }
