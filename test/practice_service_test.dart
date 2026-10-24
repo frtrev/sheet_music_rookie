@@ -95,16 +95,32 @@ void main() {
       expect(session.process(detected(599, 78), voiceDetected: true), isNull);
       expect(session.progress, closeTo(599 / 600, .001));
       final advanced = session.process(detected(600, 78), voiceDetected: true);
-      expect(advanced?.cursorTick, 2880);
+      expect(advanced?.cursorTick, 2400);
       expect(advanced?.completed, isFalse);
       expect(session.progress, 0);
 
+      // The written eighth-rest must elapse before the next note can begin.
+      expect(
+        session.process(null, voiceDetected: false, timestampMs: 650),
+        isNull,
+      );
+      expect(
+        session.process(null, voiceDetected: false, timestampMs: 1149),
+        isNull,
+      );
+      expect(
+        session
+            .process(null, voiceDetected: false, timestampMs: 1150)
+            ?.cursorTick,
+        2880,
+      );
+
       // A wrong pitch does not earn time for the next target.
-      expect(session.process(detected(700, 71), voiceDetected: true), isNull);
+      expect(session.process(detected(1200, 71), voiceDetected: true), isNull);
       expect(session.progress, 0);
-      expect(session.process(detected(800, 72), voiceDetected: true), isNull);
+      expect(session.process(detected(1250, 72), voiceDetected: true), isNull);
       final completed = session.process(
-        detected(1100, 72),
+        detected(1550, 72),
         voiceDetected: true,
       );
       expect(completed?.completed, isTrue);
@@ -234,9 +250,69 @@ void main() {
       advanced.process(detected(100, 69), voiceDetected: true)?.cursorTick,
       480,
     );
-    final restarted = advanced.process(detected(200, 69), voiceDetected: true);
+    expect(
+      advanced.process(null, voiceDetected: false, timestampMs: 110),
+      isNull,
+    );
+    expect(
+      advanced
+          .process(null, voiceDetected: false, timestampMs: 145)
+          ?.cursorTick,
+      480,
+    );
+    advanced.process(detected(200, 71), voiceDetected: true);
+    advanced.process(detected(250, 71), voiceDetected: true);
+    final restarted = advanced.process(detected(260, 69), voiceDetected: true);
     expect(restarted?.cursorTick, 0);
     expect(advanced.currentTarget?.soundingMidiPitch, 69);
     expect(advanced.progress, 0);
+  });
+
+  test('a sustained pitch cannot complete consecutive repeated notes', () {
+    const composition = Composition(
+      clef: ClefType.treble,
+      tempoBpm: 120,
+      measures: [
+        Measure(
+          index: 0,
+          notes: [
+            MusicalNote(midiPitch: 69, startTick: 0, durationTicks: 480),
+            MusicalNote(midiPitch: 69, startTick: 480, durationTicks: 480),
+          ],
+        ),
+      ],
+    );
+    final session = PracticeSession(
+      composition,
+      pitchStabilityMs: 100,
+      articulationGapMs: 35,
+      requiredDurationFraction: .1,
+    );
+
+    session.process(detected(0, 69), voiceDetected: true);
+    expect(
+      session.process(detected(100, 69), voiceDetected: true)?.cursorTick,
+      480,
+    );
+
+    // Holding the same syllable cannot spill progress into the next note.
+    expect(session.process(detected(200, 69), voiceDetected: true), isNull);
+    expect(session.process(detected(300, 69), voiceDetected: true), isNull);
+    expect(session.progress, 0);
+
+    // A short articulation gap unlocks the repeated note.
+    expect(
+      session.process(null, voiceDetected: false, timestampMs: 310),
+      isNull,
+    );
+    expect(
+      session.process(null, voiceDetected: false, timestampMs: 345)?.cursorTick,
+      480,
+    );
+    session.process(detected(400, 69), voiceDetected: true);
+    expect(
+      session.process(detected(500, 69), voiceDetected: true)?.completed,
+      isTrue,
+    );
   });
 }

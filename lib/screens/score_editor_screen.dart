@@ -77,22 +77,12 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.composition.addListener(_compositionChanged);
     _engine.notationCursorTick.addListener(_notationCursorChanged);
     _engine.microphoneStatus.addListener(_microphoneStatusChanged);
-    _engine.livePitch.addListener(_practicePitchChanged);
+    _engine.audioFrameTimestampMs.addListener(_practiceFrameChanged);
     unawaited(_engine.initialize());
   }
 
   void _microphoneStatusChanged() {
     final status = _engine.microphoneStatus.value;
-    if (_practiceActive && status != MicrophoneStatus.voiceDetected) {
-      final session = _practiceSession;
-      if (session != null) {
-        _syncPracticeSettings(session);
-        _applyPracticeUpdate(
-          session,
-          session.process(null, voiceDetected: false),
-        );
-      }
-    }
     if (status == MicrophoneStatus.paused ||
         status == MicrophoneStatus.unavailable) {
       unawaited(_metronome.stop());
@@ -116,15 +106,17 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     );
   }
 
-  void _practicePitchChanged() {
+  void _practiceFrameChanged() {
     if (!_practiceActive) return;
     final session = _practiceSession;
     if (session == null) return;
     _syncPracticeSettings(session);
+    final voiceDetected =
+        _engine.microphoneStatus.value == MicrophoneStatus.voiceDetected;
     final update = session.process(
-      _engine.livePitch.value,
-      voiceDetected:
-          _engine.microphoneStatus.value == MicrophoneStatus.voiceDetected,
+      voiceDetected ? _engine.livePitch.value : null,
+      voiceDetected: voiceDetected,
+      timestampMs: _engine.audioFrameTimestampMs.value,
     );
     _applyPracticeUpdate(session, update);
   }
@@ -133,6 +125,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     final settings = _engine.settings.value;
     session
       ..pitchToleranceCents = settings.pitchToleranceCents
+      ..articulationGapMs = settings.articulationGapMs
       ..difficulty = settings.practiceDifficulty;
   }
 
@@ -392,6 +385,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _engine.composition.value,
       pitchStabilityMs: _engine.settings.value.pitchStabilityMs,
       pitchToleranceCents: _engine.settings.value.pitchToleranceCents,
+      articulationGapMs: _engine.settings.value.articulationGapMs,
       difficulty: _engine.settings.value.practiceDifficulty,
     );
     if (!session.hasTargets) {
@@ -1308,7 +1302,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.composition.removeListener(_compositionChanged);
     _engine.notationCursorTick.removeListener(_notationCursorChanged);
     _engine.microphoneStatus.removeListener(_microphoneStatusChanged);
-    _engine.livePitch.removeListener(_practicePitchChanged);
+    _engine.audioFrameTimestampMs.removeListener(_practiceFrameChanged);
     _playback.position.removeListener(_playbackPositionChanged);
     _playback.isPlaying.removeListener(_transportWakeStateChanged);
     _scoreScroll.dispose();

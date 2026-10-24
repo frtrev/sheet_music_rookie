@@ -11,12 +11,14 @@ class PracticeTarget {
     required this.durationTicks,
     required this.soundingMidiPitch,
     required this.sourceEventIndex,
+    this.silenceBeforeTicks = 0,
   });
 
   final int startTick;
   final int durationTicks;
   final int soundingMidiPitch;
   final int sourceEventIndex;
+  final int silenceBeforeTicks;
 
   int get endTick => startTick + durationTicks;
 
@@ -25,6 +27,7 @@ class PracticeTarget {
     durationTicks: durationTicks + ticks,
     soundingMidiPitch: soundingMidiPitch,
     sourceEventIndex: sourceEventIndex,
+    silenceBeforeTicks: silenceBeforeTicks,
   );
 }
 
@@ -41,6 +44,7 @@ class PracticeSession {
     this.composition, {
     required this.pitchStabilityMs,
     this.pitchToleranceCents = 45,
+    this.articulationGapMs = 35,
     this.difficulty = PracticeDifficulty.beginner,
     this.requiredDurationFraction = .6,
   }) : targets = _targetsFor(composition);
@@ -48,6 +52,7 @@ class PracticeSession {
   final Composition composition;
   final int pitchStabilityMs;
   double pitchToleranceCents;
+  int articulationGapMs;
   PracticeDifficulty difficulty;
   final double requiredDurationFraction;
   final List<PracticeTarget> targets;
@@ -56,6 +61,11 @@ class PracticeSession {
   int _heldMs = 0;
   int _streakBaseMs = 0;
   double _progress = 0;
+  bool _awaitingRelease = false;
+  bool _releaseRequiresRest = false;
+  int _requiredReleaseMs = 0;
+  int? _silenceStartedMs;
+  int? _previousTargetPitch;
 
   bool get hasTargets => targets.isNotEmpty;
   bool get completed => _targetIndex >= targets.length;
@@ -65,9 +75,30 @@ class PracticeSession {
   PracticeUpdate? process(
     PitchDetectionResult? result, {
     required bool voiceDetected,
+    int? timestampMs,
   }) {
     final target = currentTarget;
     if (target == null) return null;
+    final frameTimestamp = timestampMs ?? result?.timestampMs;
+    if (_awaitingRelease) {
+      if (!voiceDetected) {
+        if (frameTimestamp == null) return null;
+        _silenceStartedMs ??= frameTimestamp;
+        if (frameTimestamp - _silenceStartedMs! < _requiredReleaseMs) {
+          return null;
+        }
+        _clearReleaseGate();
+        return PracticeUpdate(cursorTick: target.startTick, completed: false);
+      }
+      _silenceStartedMs = null;
+      final changedToExpectedPitch =
+          !_releaseRequiresRest &&
+          result != null &&
+          target.soundingMidiPitch != _previousTargetPitch &&
+          _isPitchAccepted(result, target);
+      if (!changedToExpectedPitch) return null;
+      _clearReleaseGate();
+    }
     if (!voiceDetected || result == null || !_isPitchAccepted(result, target)) {
       return _handleMiss();
     }
@@ -86,11 +117,27 @@ class PracticeSession {
     _progress = (_heldMs / requiredMs).clamp(0.0, 1.0).toDouble();
     if (_heldMs < requiredMs) return null;
 
+    final completedTarget = target;
     _targetIndex++;
     _resetCurrentNote();
+    if (!completed) {
+      final nextTarget = targets[_targetIndex];
+      _releaseRequiresRest = nextTarget.silenceBeforeTicks > 0;
+      _requiredReleaseMs = _releaseRequiresRest
+          ? (nextTarget.silenceBeforeTicks *
+                    60000 /
+                    (composition.tempoBpm * 480))
+                .round()
+          : articulationGapMs;
+      _previousTargetPitch = completedTarget.soundingMidiPitch;
+      _awaitingRelease = _requiredReleaseMs > 0;
+      _silenceStartedMs = null;
+    }
     return PracticeUpdate(
       cursorTick: completed
           ? _scoreEndTick(composition)
+          : _releaseRequiresRest
+          ? completedTarget.endTick
           : targets[_targetIndex].startTick,
       completed: completed,
     );
@@ -109,6 +156,7 @@ class PracticeSession {
         final shouldMove = _targetIndex != 0 || _heldMs != 0 || _progress != 0;
         _targetIndex = 0;
         _resetCurrentNote();
+        _clearReleaseGate();
         if (!shouldMove || targets.isEmpty) return null;
         return PracticeUpdate(
           cursorTick: targets.first.startTick,
@@ -122,6 +170,14 @@ class PracticeSession {
     _heldMs = 0;
     _streakBaseMs = 0;
     _progress = 0;
+  }
+
+  void _clearReleaseGate() {
+    _awaitingRelease = false;
+    _releaseRequiresRest = false;
+    _requiredReleaseMs = 0;
+    _silenceStartedMs = null;
+    _previousTargetPitch = null;
   }
 
   bool _isPitchAccepted(PitchDetectionResult result, PracticeTarget target) {
@@ -166,6 +222,9 @@ class PracticeSession {
             durationTicks: note.durationTicks,
             soundingMidiPitch: soundingPitch,
             sourceEventIndex: note.sourceEventIndex,
+            silenceBeforeTicks: targets.isEmpty
+                ? 0
+                : math.max(0, startTick - targets.last.endTick).toInt(),
           ),
         );
       }
