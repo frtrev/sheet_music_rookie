@@ -114,6 +114,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (!_practiceActive) return;
     final session = _practiceSession;
     if (session == null) return;
+    session.pitchToleranceCents = _engine.settings.value.pitchToleranceCents;
     final update = session.process(
       _engine.livePitch.value,
       voiceDetected:
@@ -373,6 +374,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     final session = PracticeSession(
       _engine.composition.value,
       pitchStabilityMs: _engine.settings.value.pitchStabilityMs,
+      pitchToleranceCents: _engine.settings.value.pitchToleranceCents,
     );
     if (!session.hasTargets) {
       if (mounted) {
@@ -1065,6 +1067,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                                   ?.soundingMidiPitch,
                               pitch: _engine.livePitch,
                               microphoneStatus: _engine.microphoneStatus,
+                              settings: _engine.settings,
                             ),
                             Expanded(
                               child: ScoreView(

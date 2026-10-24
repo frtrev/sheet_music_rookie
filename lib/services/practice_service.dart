@@ -39,11 +39,13 @@ class PracticeSession {
   PracticeSession(
     this.composition, {
     required this.pitchStabilityMs,
+    this.pitchToleranceCents = 45,
     this.requiredDurationFraction = .6,
   }) : targets = _targetsFor(composition);
 
   final Composition composition;
   final int pitchStabilityMs;
+  double pitchToleranceCents;
   final double requiredDurationFraction;
   final List<PracticeTarget> targets;
   int _targetIndex = 0;
@@ -61,9 +63,7 @@ class PracticeSession {
   }) {
     final target = currentTarget;
     if (target == null) return null;
-    if (!voiceDetected ||
-        result == null ||
-        result.midiNote != target.soundingMidiPitch) {
+    if (!voiceDetected || result == null || !_isPitchAccepted(result, target)) {
       _correctPitchSinceMs = null;
       _progress = 0;
       return null;
@@ -89,6 +89,14 @@ class PracticeSession {
           : targets[_targetIndex].startTick,
       completed: completed,
     );
+  }
+
+  bool _isPitchAccepted(PitchDetectionResult result, PracticeTarget target) {
+    if (result.frequencyHz <= 0) return false;
+    final targetHz = 440 * math.pow(2, (target.soundingMidiPitch - 69) / 12);
+    final errorCents =
+        1200 * math.log(result.frequencyHz / targetHz) / math.ln2;
+    return errorCents.abs() <= pitchToleranceCents;
   }
 
   static List<PracticeTarget> _targetsFor(Composition composition) {

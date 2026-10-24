@@ -111,12 +111,12 @@ class VoiceSettingsPanel extends StatelessWidget {
               onChanged(value.copyWith(articulationGapMs: v.round())),
         ),
         _SettingSlider(
-          label: 'Pitch tolerance',
+          label: 'Pitch tolerance (capture & practice)',
           value: value.pitchToleranceCents,
           min: 10,
           max: 100,
           divisions: 18,
-          suffix: 'cents',
+          formatter: (v) => '±${v.round()} cents',
           onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
         ),
         _SettingSlider(

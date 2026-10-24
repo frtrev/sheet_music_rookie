@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sheet_music_rookie/models/composition.dart';
 import 'package:sheet_music_rookie/models/measure.dart';
@@ -8,7 +10,7 @@ import 'package:sheet_music_rookie/services/practice_service.dart';
 PitchDetectionResult detected(int timestampMs, int midi) =>
     PitchDetectionResult(
       timestampMs: timestampMs,
-      frequencyHz: 440,
+      frequencyHz: (440 * math.pow(2, (midi - 69) / 12)).toDouble(),
       midiNote: midi,
       noteName: 'Test',
       octave: 4,
@@ -16,6 +18,22 @@ PitchDetectionResult detected(int timestampMs, int midi) =>
       confidence: 1,
       rmsAmplitude: .2,
     );
+
+PitchDetectionResult detectedAtCents(
+  int timestampMs,
+  int targetMidi,
+  double cents,
+) => PitchDetectionResult(
+  timestampMs: timestampMs,
+  frequencyHz: (440 * math.pow(2, (targetMidi - 69) / 12 + cents / 1200))
+      .toDouble(),
+  midiNote: targetMidi,
+  noteName: 'Test',
+  octave: 4,
+  centsDeviation: cents,
+  confidence: 1,
+  rmsAmplitude: .2,
+);
 
 void main() {
   test(
@@ -111,6 +129,43 @@ void main() {
     expect(session.process(detected(400, 60), voiceDetected: true), isNull);
     expect(
       session.process(detected(700, 60), voiceDetected: true)?.completed,
+      isTrue,
+    );
+  });
+
+  test('practice accepts pitch inside the configurable cents range', () {
+    const composition = Composition(
+      clef: ClefType.treble,
+      tempoBpm: 120,
+      measures: [
+        Measure(
+          index: 0,
+          notes: [MusicalNote(midiPitch: 69, startTick: 0, durationTicks: 480)],
+        ),
+      ],
+    );
+    final session = PracticeSession(
+      composition,
+      pitchStabilityMs: 100,
+      pitchToleranceCents: 30,
+      requiredDurationFraction: .1,
+    );
+
+    expect(
+      session.process(detectedAtCents(0, 69, 35), voiceDetected: true),
+      isNull,
+    );
+    expect(session.progress, 0);
+
+    session.pitchToleranceCents = 40;
+    expect(
+      session.process(detectedAtCents(100, 69, 35), voiceDetected: true),
+      isNull,
+    );
+    expect(
+      session
+          .process(detectedAtCents(200, 69, 35), voiceDetected: true)
+          ?.completed,
       isTrue,
     );
   });

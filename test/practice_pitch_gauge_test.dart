@@ -57,4 +57,10 @@ void main() {
 
     expect(reading.position, 1);
   });
+
+  test('pitch tolerance maps to symmetric visible gauge limits', () {
+    expect(PitchGaugeReading.positionForCents(45), closeTo(.225, .001));
+    expect(PitchGaugeReading.positionForCents(-45), closeTo(-.225, .001));
+    expect(PitchGaugeReading.positionForCents(100), closeTo(.5, .001));
+  });
 }

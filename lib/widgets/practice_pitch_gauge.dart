@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../audio/microphone_service.dart';
 import '../models/pitch_detection_result.dart';
+import '../models/voice_detection_settings.dart';
 
 class PitchGaugeReading {
   const PitchGaugeReading({required this.errorCents});
@@ -13,12 +14,25 @@ class PitchGaugeReading {
 
   /// Keeps the moving marker inside the gauge while still showing errors up
   /// to two semitones in either direction.
-  double get position => (errorCents / 200).clamp(-1.0, 1.0).toDouble();
+  double get position => positionForCents(errorCents);
+
+  static double positionForCents(double cents) =>
+      (cents / 200).clamp(-1.0, 1.0).toDouble();
 
   /// Green at the target, yellow at 50 cents, and red at a semitone or more.
   Color get color {
     final distance = errorCents.abs().clamp(0.0, 100.0).toDouble();
     return HSVColor.fromAHSV(1, 120 * (1 - distance / 100), .78, .78).toColor();
+  }
+
+  Color colorForTolerance(double toleranceCents) {
+    final distance = errorCents.abs();
+    if (distance <= toleranceCents) return const Color(0xff31945b);
+    final outside =
+        ((distance - toleranceCents) / math.max(1, 100 - toleranceCents))
+            .clamp(0.0, 1.0)
+            .toDouble();
+    return HSVColor.fromAHSV(1, 55 * (1 - outside), .82, .82).toColor();
   }
 
   String get description {
@@ -50,36 +64,51 @@ class PracticePitchGauge extends StatelessWidget {
     required this.targetMidiPitch,
     required this.pitch,
     required this.microphoneStatus,
+    required this.settings,
   });
 
   final bool active;
   final int? targetMidiPitch;
   final ValueListenable<PitchDetectionResult?> pitch;
   final ValueListenable<MicrophoneStatus> microphoneStatus;
+  final ValueListenable<VoiceDetectionSettings> settings;
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<MicrophoneStatus>(
       valueListenable: microphoneStatus,
       builder: (context, status, _) =>
-          ValueListenableBuilder<PitchDetectionResult?>(
-            valueListenable: pitch,
-            builder: (context, detectedPitch, _) {
-              final reading = active && status == MicrophoneStatus.voiceDetected
-                  ? PitchGaugeReading.from(
-                      detectedPitch: detectedPitch,
-                      targetMidiPitch: targetMidiPitch,
-                    )
-                  : null;
-              return _PitchGauge(reading: reading, active: active);
-            },
+          ValueListenableBuilder<VoiceDetectionSettings>(
+            valueListenable: settings,
+            builder: (context, voiceSettings, _) =>
+                ValueListenableBuilder<PitchDetectionResult?>(
+                  valueListenable: pitch,
+                  builder: (context, detectedPitch, _) {
+                    final reading =
+                        active && status == MicrophoneStatus.voiceDetected
+                        ? PitchGaugeReading.from(
+                            detectedPitch: detectedPitch,
+                            targetMidiPitch: targetMidiPitch,
+                          )
+                        : null;
+                    return _PitchGauge(
+                      reading: reading,
+                      active: active,
+                      toleranceCents: voiceSettings.pitchToleranceCents,
+                    );
+                  },
+                ),
           ),
     );
   }
 }
 
 class _PitchGauge extends StatelessWidget {
-  const _PitchGauge({required this.reading, required this.active});
+  const _PitchGauge({
+    required this.reading,
+    required this.active,
+    required this.toleranceCents,
+  });
 
   static const _width = 34.0;
   static const _markerWidth = 18.0;
@@ -88,16 +117,19 @@ class _PitchGauge extends StatelessWidget {
 
   final PitchGaugeReading? reading;
   final bool active;
+  final double toleranceCents;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = reading?.color ?? scheme.outlineVariant;
+    final color =
+        reading?.colorForTolerance(toleranceCents) ?? scheme.outlineVariant;
     final semantics = !active
         ? 'Pitch gauge inactive'
         : reading == null
         ? 'Pitch gauge waiting for a tone'
-        : 'Pitch ${reading!.description}';
+        : 'Pitch ${reading!.description}; acceptable within plus or minus '
+              '${toleranceCents.round()} cents';
 
     return Semantics(
       label: semantics,
@@ -112,6 +144,13 @@ class _PitchGauge extends StatelessWidget {
             );
             final normalized = reading?.position ?? 0;
             final markerTop = _verticalInset + (1 - normalized) * travel / 2;
+            final tolerancePosition = PitchGaugeReading.positionForCents(
+              toleranceCents,
+            );
+            final upperLimitTop =
+                _verticalInset + (1 - tolerancePosition) * travel / 2;
+            final lowerLimitTop =
+                _verticalInset + (1 + tolerancePosition) * travel / 2;
             return DecoratedBox(
               decoration: BoxDecoration(
                 color: color.withValues(alpha: reading == null ? .08 : .16),
@@ -131,6 +170,19 @@ class _PitchGauge extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Positioned(
+                    top: upperLimitTop,
+                    width: _markerWidth + 8,
+                    height: lowerLimitTop - upperLimitTop,
+                    child: ColoredBox(color: const Color(0x1831945b)),
+                  ),
+                  for (final top in [upperLimitTop, lowerLimitTop])
+                    Positioned(
+                      top: top - 1,
+                      width: _markerWidth + 10,
+                      height: 2,
+                      child: const ColoredBox(color: Color(0xff31945b)),
+                    ),
                   Positioned(
                     top: constraints.maxHeight / 2 - .5,
                     width: _markerWidth + 6,
