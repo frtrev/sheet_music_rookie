@@ -758,6 +758,24 @@ class TranscriptionEngine {
     _rebuildComposition();
   }
 
+  void setOctaveRange(OctaveRange octaveRange) {
+    final previous = composition.value.octaveRange;
+    if (previous == octaveRange) return;
+    if (isPunchingIn) _finishPunchIn();
+    final pitchDelta = octaveRange.semitones - previous.semitones;
+    for (var index = 0; index < rawEvents.length; index++) {
+      final event = rawEvents[index];
+      if (event.isRest) continue;
+      final midiPitch = (event.midiPitch + pitchDelta).clamp(0, 127).toInt();
+      rawEvents[index] = event.copyWith(
+        midiPitch: midiPitch,
+        frequencyHz: (440 * math.pow(2, (midiPitch - 69) / 12)).toDouble(),
+      );
+    }
+    composition.value = composition.value.copyWith(octaveRange: octaveRange);
+    _rebuildComposition();
+  }
+
   void setTitle(String title) {
     composition.value = composition.value.copyWith(title: title.trim());
   }

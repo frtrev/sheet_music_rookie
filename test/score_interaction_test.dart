@@ -338,6 +338,42 @@ void main() {
     },
   );
 
+  test('changing octave range preserves notation and transposes playback', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(64, 500)]);
+
+    engine.setOctaveRange(OctaveRange.octaveDown);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [48, 52]);
+    expect(
+      engine.composition.value.measures.first.notes.map(
+        (note) => note.midiPitch,
+      ),
+      [60, 64],
+    );
+
+    engine.setOctaveRange(OctaveRange.standard);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [60, 64]);
+    expect(
+      engine.composition.value.measures.first.notes.map(
+        (note) => note.midiPitch,
+      ),
+      [60, 64],
+    );
+
+    engine.setOctaveRange(OctaveRange.octaveUp);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [72, 76]);
+    expect(
+      engine.composition.value.measures.first.notes.map(
+        (note) => note.midiPitch,
+      ),
+      [60, 64],
+    );
+  });
+
   test('selected note toggles to a rest and back to the first-line note', () {
     final engine = TranscriptionEngine(
       clef: ClefType.treble,

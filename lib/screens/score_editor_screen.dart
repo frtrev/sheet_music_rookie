@@ -630,6 +630,77 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (result != null) _engine.setKeySignature(result);
   }
 
+  Future<void> _showOctaveRangeDialog() async {
+    if (_practiceActive) await _stopPractice();
+    if (!mounted) return;
+    var selected = _engine.composition.value.octaveRange;
+    final result = await showDialog<OctaveRange>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Choose octave range'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final range in OctaveRange.values)
+                  ListTile(
+                    leading: Icon(
+                      range == selected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                    ),
+                    title: Text(range.label),
+                    subtitle: range == OctaveRange.standard
+                        ? const Text('Written and sounding pitch match')
+                        : Text(_octaveRangeDescription(range)),
+                    dense: true,
+                    selected: range == selected,
+                    onTap: () => setDialogState(() => selected = range),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, selected),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || result == _engine.composition.value.octaveRange) {
+      return;
+    }
+    final selectedTick = _engine.notationCursorTick.value;
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.setOctaveRange(result);
+    _engine.notationCursorTick.value = selectedTick.clamp(
+      0,
+      _engine.composition.value.editableEndTick,
+    );
+  }
+
+  String _octaveRangeDescription(OctaveRange range) {
+    final octaves = range.semitones.abs() ~/ 12;
+    final direction = range.semitones < 0 ? 'lower' : 'higher';
+    return '${range.notationLabel} · written notes stay in place · '
+        'sounds $octaves octave${octaves == 1 ? '' : 's'} $direction';
+  }
+
   Future<void> _showTimeSignatureDialog() async {
     final composition = _engine.composition.value;
     if (composition.measures.isEmpty) return;
@@ -1040,6 +1111,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                     cursorTick,
                   ),
                   onKeySignaturePressed: _showKeySignatureDialog,
+                  onOctaveRangePressed: _showOctaveRangeDialog,
                   onTimeSignaturePressed: _showTimeSignatureDialog,
                   onVolumesPressed: _showVolumeDialog,
                   onMetronomeChanged: (mode) =>
@@ -1519,6 +1591,7 @@ class _CompositionHeader extends StatelessWidget {
     required this.composition,
     required this.selectedMeasureIndex,
     required this.onKeySignaturePressed,
+    required this.onOctaveRangePressed,
     required this.onTimeSignaturePressed,
     required this.onVolumesPressed,
     required this.onMetronomeChanged,
@@ -1526,6 +1599,7 @@ class _CompositionHeader extends StatelessWidget {
   final Composition composition;
   final int selectedMeasureIndex;
   final VoidCallback onKeySignaturePressed;
+  final VoidCallback onOctaveRangePressed;
   final VoidCallback onTimeSignaturePressed;
   final VoidCallback onVolumesPressed;
   final ValueChanged<MetronomeMode> onMetronomeChanged;
@@ -1539,7 +1613,12 @@ class _CompositionHeader extends StatelessWidget {
         Icons.music_note,
         composition.clef == ClefType.treble ? 'Treble clef' : 'Bass clef',
       ),
-      _chip(Icons.swap_vert, composition.octaveRange.label),
+      ActionChip(
+        avatar: const Icon(Icons.swap_vert, size: 16),
+        label: Text(composition.octaveRange.label),
+        onPressed: onOctaveRangePressed,
+        visualDensity: VisualDensity.compact,
+      ),
       ActionChip(
         avatar: const Icon(Icons.key, size: 16),
         label: Text(composition.keySignature.label),

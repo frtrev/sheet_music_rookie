@@ -148,6 +148,7 @@ class Composition {
     double? metronomeVolume,
     double? playbackVolume,
     KeySignature? keySignature,
+    OctaveRange? octaveRange,
     int? beatsPerMeasure,
     int? beatUnit,
   }) {
@@ -158,7 +159,7 @@ class Composition {
       beatUnit: beatUnit ?? this.beatUnit,
       tempoBpm: tempoBpm,
       clef: clef,
-      octaveRange: octaveRange,
+      octaveRange: octaveRange ?? this.octaveRange,
       recordingMode: recordingMode,
       metronomeMode: metronomeMode ?? this.metronomeMode,
       metronomeVolume: metronomeVolume ?? this.metronomeVolume,
