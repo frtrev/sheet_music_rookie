@@ -1111,7 +1111,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 });
               },
               icon: const Icon(Icons.tune),
-              tooltip: 'Voice Settings',
+              tooltip: 'Settings',
             ),
           ],
         ),
@@ -1279,7 +1279,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 initiallyExpanded: _settingsExpanded,
                 onExpansionChanged: (value) => _settingsExpanded = value,
                 leading: const Icon(Icons.graphic_eq),
-                title: const Text('Voice Detection Settings'),
+                title: const Text('Settings'),
                 subtitle: const Text(
                   'Changes apply while the microphone is running',
                 ),

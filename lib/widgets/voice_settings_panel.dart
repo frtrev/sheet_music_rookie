@@ -16,24 +16,48 @@ class VoiceSettingsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton.tonalIcon(
-            onPressed: () => onChanged(
-              value.copyWith(
-                minimumNoteDurationMs: 100,
-                pitchStabilityMs: 70,
-                silenceDurationMs: 180,
-                articulationGapMs: 35,
-                pitchToleranceCents: 45,
-                smoothingWindow: 3,
-              ),
+        _SettingSlider(
+          label: 'Practice difficulty',
+          value: value.practiceDifficulty.index.toDouble(),
+          min: 0,
+          max: 2,
+          divisions: 2,
+          formatter: (v) => PracticeDifficulty.values[v.round()].label,
+          onChanged: (v) => onChanged(
+            value.copyWith(
+              practiceDifficulty: PracticeDifficulty.values[v.round()],
             ),
-            icon: const Icon(Icons.record_voice_over),
-            label: const Text('Optimize for “La, La, La”'),
           ),
         ),
-        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              value.practiceDifficulty.description,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ),
+        _SettingSlider(
+          label: 'Pitch stability',
+          value: value.pitchStabilityMs.toDouble(),
+          min: 25,
+          max: 400,
+          divisions: 15,
+          suffix: 'ms',
+          onChanged: (v) =>
+              onChanged(value.copyWith(pitchStabilityMs: v.round())),
+        ),
+        _SettingSlider(
+          label: 'Pitch tolerance (capture & practice)',
+          value: value.pitchToleranceCents,
+          min: 10,
+          max: 100,
+          divisions: 18,
+          formatter: (v) => '±${v.round()} cents',
+          onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
+        ),
         _SettingSlider(
           label: 'Minimum frequency',
           value: value.minimumFrequency,
@@ -72,16 +96,6 @@ class VoiceSettingsPanel extends StatelessWidget {
               onChanged(value.copyWith(minimumNoteDurationMs: v.round())),
         ),
         _SettingSlider(
-          label: 'Pitch stability',
-          value: value.pitchStabilityMs.toDouble(),
-          min: 25,
-          max: 400,
-          divisions: 15,
-          suffix: 'ms',
-          onChanged: (v) =>
-              onChanged(value.copyWith(pitchStabilityMs: v.round())),
-        ),
-        _SettingSlider(
           label: 'Silence threshold',
           value: value.silenceThresholdDb,
           min: -70,
@@ -109,38 +123,6 @@ class VoiceSettingsPanel extends StatelessWidget {
           suffix: 'ms',
           onChanged: (v) =>
               onChanged(value.copyWith(articulationGapMs: v.round())),
-        ),
-        _SettingSlider(
-          label: 'Pitch tolerance (capture & practice)',
-          value: value.pitchToleranceCents,
-          min: 10,
-          max: 100,
-          divisions: 18,
-          formatter: (v) => '±${v.round()} cents',
-          onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
-        ),
-        _SettingSlider(
-          label: 'Practice difficulty',
-          value: value.practiceDifficulty.index.toDouble(),
-          min: 0,
-          max: 2,
-          divisions: 2,
-          formatter: (v) => PracticeDifficulty.values[v.round()].label,
-          onChanged: (v) => onChanged(
-            value.copyWith(
-              practiceDifficulty: PracticeDifficulty.values[v.round()],
-            ),
-          ),
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              value.practiceDifficulty.description,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ),
         ),
         _SettingSlider(
           label: 'Smoothing window',

@@ -24,7 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Voice Detection Settings')),
+    appBar: AppBar(title: const Text('Settings')),
     body: _settings == null
         ? const Center(child: CircularProgressIndicator())
         : ListView(
