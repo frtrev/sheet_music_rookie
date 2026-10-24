@@ -8,6 +8,7 @@ import '../audio/note_segmenter.dart';
 import '../audio/pitch_detector.dart';
 import '../audio/pitch_smoother.dart';
 import '../models/composition.dart';
+import '../models/measure.dart';
 import '../models/musical_note.dart';
 import '../models/pitch_detection_result.dart';
 import '../models/raw_note_event.dart';
@@ -185,8 +186,10 @@ class TranscriptionEngine {
         events,
         composition.value.tempoBpm,
         composition.value.beatsPerMeasure,
+        beatUnit: composition.value.beatUnit,
         octaveTranspositionSemitones: composition.value.octaveRange.semitones,
         keySignature: composition.value.keySignature,
+        measureTemplates: composition.value.measures,
       ),
     );
     if (active != null || preview.isNotEmpty) {
@@ -300,20 +303,18 @@ class TranscriptionEngine {
   /// split except at the measure boundary itself.
   int insertMeasureAfterTick(int tick) {
     if (isPunchingIn) _finishPunchIn();
-    final capacity = composition.value.beatsPerMeasure * 480;
+    final current = composition.value;
     final totalTicks = _totalTicks(rawEvents);
-    final editableEnd = math.max(
-      capacity,
-      composition.value.measures.length * capacity,
-    );
+    final editableEnd = current.editableEndTick;
     final boundedTick = tick.clamp(0, editableEnd).toInt();
-    var measureIndex = boundedTick ~/ capacity;
+    var measureIndex = current.measureIndexAtTick(boundedTick);
     if (boundedTick > 0 &&
-        boundedTick % capacity == 0 &&
+        boundedTick == current.measureStartTick(measureIndex) &&
         eventIndexAtTick(boundedTick) == null) {
-      measureIndex--;
+      measureIndex = math.max(0, measureIndex - 1);
     }
-    final insertionTick = (measureIndex + 1) * capacity;
+    final insertionTick = current.measureStartTick(measureIndex + 1);
+    final capacity = current.measureCapacityTicks(measureIndex);
     final splitTick = math.min(insertionTick, totalTicks);
     final before = <({RawNoteEvent event, int ticks})>[];
     final after = <({RawNoteEvent event, int ticks})>[];
@@ -350,9 +351,59 @@ class TranscriptionEngine {
       ...after,
     ];
     _replaceWithPieces(pieces);
+    final sourceMeasure = current.measures[measureIndex];
+    final templates = [...current.measures]
+      ..insert(
+        measureIndex + 1,
+        Measure(
+          index: measureIndex + 1,
+          beatsPerMeasure: sourceMeasure.effectiveBeats(
+            current.beatsPerMeasure,
+          ),
+          beatUnit: sourceMeasure.effectiveBeatUnit(current.beatUnit),
+        ),
+      );
+    composition.value = current.copyWith(
+      measures: [
+        for (final (index, measure) in templates.indexed)
+          Measure(
+            index: index,
+            notes: measure.notes,
+            beatsPerMeasure: measure.beatsPerMeasure,
+            beatUnit: measure.beatUnit,
+          ),
+      ],
+    );
     notationCursorTick.value = boundedTick;
     _rebuildComposition();
     return insertionTick;
+  }
+
+  void setMeasureTimeSignatureAtTick(
+    int tick, {
+    required int beatsPerMeasure,
+    required int beatUnit,
+  }) {
+    if (isPunchingIn) _finishPunchIn();
+    final current = composition.value;
+    if (current.measures.isEmpty) return;
+    final measureIndex = current.measureIndexAtTick(tick);
+    final templates = [
+      for (final measure in current.measures)
+        Measure(
+          index: measure.index,
+          notes: measure.notes,
+          beatsPerMeasure: measure.index == measureIndex
+              ? beatsPerMeasure.clamp(1, 32)
+              : measure.beatsPerMeasure,
+          beatUnit: measure.index == measureIndex ? beatUnit : measure.beatUnit,
+        ),
+    ];
+    composition.value = current.copyWith(measures: templates);
+    _rebuildComposition();
+    notationCursorTick.value = tick
+        .clamp(0, composition.value.editableEndTick)
+        .toInt();
   }
 
   List<({RawNoteEvent event, int ticks})> _restPieces(int ticks) {
@@ -416,10 +467,7 @@ class TranscriptionEngine {
   bool canToggleRestAtTick(int tick) {
     if (eventIndexAtTick(tick) != null) return true;
     final totalTicks = _totalTicks(rawEvents);
-    final editableEnd =
-        composition.value.measures.length *
-        composition.value.beatsPerMeasure *
-        480;
+    final editableEnd = composition.value.editableEndTick;
     return tick >= totalTicks && tick < editableEnd;
   }
 
@@ -473,8 +521,10 @@ class TranscriptionEngine {
     if (!canToggleRestAtTick(tick)) return null;
     final totalTicks = _totalTicks(rawEvents);
     if (tick > totalTicks) _appendRestDuration(tick - totalTicks);
-    final capacity = composition.value.beatsPerMeasure * 480;
-    final positionInMeasure = tick % capacity;
+    final measureIndex = composition.value.measureIndexAtTick(tick);
+    final capacity = composition.value.measureCapacityTicks(measureIndex);
+    final positionInMeasure =
+        tick - composition.value.measureStartTick(measureIndex);
     final available = positionInMeasure == 0
         ? capacity
         : capacity - positionInMeasure;

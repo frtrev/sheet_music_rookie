@@ -105,6 +105,41 @@ class Composition {
   final bool microphoneActive;
   final List<Measure> measures;
 
+  int measureCapacityTicks(int index) {
+    if (measures.isEmpty) return beatsPerMeasure * 1920 ~/ beatUnit;
+    final safeIndex = index.clamp(0, measures.length - 1).toInt();
+    return measures[safeIndex].capacityTicks(beatsPerMeasure, beatUnit);
+  }
+
+  int measureStartTick(int index) {
+    var result = 0;
+    for (
+      var current = 0;
+      current < index && current < measures.length;
+      current++
+    ) {
+      result += measureCapacityTicks(current);
+    }
+    return result;
+  }
+
+  int get editableEndTick {
+    if (measures.isEmpty) return beatsPerMeasure * 1920 ~/ beatUnit;
+    return measureStartTick(measures.length);
+  }
+
+  int measureIndexAtTick(int tick) {
+    if (measures.isEmpty) return 0;
+    final bounded = tick.clamp(0, editableEndTick).toInt();
+    var start = 0;
+    for (var index = 0; index < measures.length; index++) {
+      final end = start + measureCapacityTicks(index);
+      if (bounded < end || index == measures.length - 1) return index;
+      start = end;
+    }
+    return measures.length - 1;
+  }
+
   Composition copyWith({
     String? title,
     List<Measure>? measures,
@@ -113,12 +148,14 @@ class Composition {
     double? metronomeVolume,
     double? playbackVolume,
     KeySignature? keySignature,
+    int? beatsPerMeasure,
+    int? beatUnit,
   }) {
     return Composition(
       title: title ?? this.title,
       keySignature: keySignature ?? this.keySignature,
-      beatsPerMeasure: beatsPerMeasure,
-      beatUnit: beatUnit,
+      beatsPerMeasure: beatsPerMeasure ?? this.beatsPerMeasure,
+      beatUnit: beatUnit ?? this.beatUnit,
       tempoBpm: tempoBpm,
       clef: clef,
       octaveRange: octaveRange,

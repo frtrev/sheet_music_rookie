@@ -67,6 +67,62 @@ void main() {
     expect(ScoreLayout.scoreEndTick(composition), 2400);
   });
 
+  test('cursor timing supports a one-beat pickup before 4/4 measures', () {
+    const composition = Composition(
+      clef: ClefType.treble,
+      measures: [
+        Measure(
+          index: 0,
+          beatsPerMeasure: 1,
+          beatUnit: 4,
+          notes: [MusicalNote(midiPitch: 59, startTick: 0, durationTicks: 480)],
+        ),
+        Measure(
+          index: 1,
+          beatsPerMeasure: 4,
+          beatUnit: 4,
+          notes: [
+            MusicalNote(midiPitch: 67, startTick: 0, durationTicks: 1920),
+          ],
+        ),
+      ],
+    );
+
+    expect(composition.measureStartTick(1), 480);
+    expect(composition.measureIndexAtTick(479), 0);
+    expect(composition.measureIndexAtTick(480), 1);
+    expect(ScoreLayout.tickAtX(composition, 366), 480);
+    expect(ScoreLayout.cursorX(composition, 480), 366);
+    expect(ScoreLayout.scoreEndTick(composition), 2400);
+  });
+
+  test('time signature editing changes only the measure under the cursor', () {
+    const initialComposition = Composition(
+      clef: ClefType.treble,
+      measures: [
+        Measure(index: 0, beatsPerMeasure: 1, beatUnit: 4),
+        Measure(index: 1, beatsPerMeasure: 4, beatUnit: 4),
+      ],
+    );
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      initialComposition: initialComposition,
+      initialEvents: [rawEvent(59, 500), rawEvent(67, 2000)],
+      microphone: FakeMicrophoneService(),
+    );
+    addTearDown(engine.dispose);
+
+    engine.setMeasureTimeSignatureAtTick(480, beatsPerMeasure: 3, beatUnit: 8);
+
+    final updated = engine.composition.value;
+    expect(updated.measures.first.beatsPerMeasure, 1);
+    expect(updated.measures.first.beatUnit, 4);
+    expect(updated.measures[1].beatsPerMeasure, 3);
+    expect(updated.measures[1].beatUnit, 8);
+    expect(updated.measureStartTick(1), 480);
+  });
+
   test('score scrolling reveals cursor movement forward and backward', () {
     final forward = ScoreLayout.scrollOffsetToRevealCursor(
       cursorX: 700,

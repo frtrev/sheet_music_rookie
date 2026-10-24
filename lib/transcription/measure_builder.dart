@@ -12,13 +12,19 @@ class MeasureBuilder {
     List<RawNoteEvent> events,
     int tempoBpm,
     int beatsPerMeasure, {
+    int beatUnit = 4,
     int octaveTranspositionSemitones = 0,
     KeySignature keySignature = KeySignature.cMajor,
+    List<Measure> measureTemplates = const [],
+    bool addTrailingMeasure = true,
   }) {
-    final capacity = beatsPerMeasure * 480;
     final notesByMeasure = <List<MusicalNote>>[[]];
     var measureIndex = 0;
     var cursor = 0;
+
+    int capacityFor(int index) => index < measureTemplates.length
+        ? measureTemplates[index].capacityTicks(beatsPerMeasure, beatUnit)
+        : beatsPerMeasure * 1920 ~/ beatUnit;
 
     for (final indexedEvent in events.indexed) {
       final (sourceEventIndex, event) = indexedEvent;
@@ -28,13 +34,14 @@ class MeasureBuilder {
       var firstPart = true;
       var continuesFromPreviousMeasure = false;
       while (remaining > 0) {
+        final capacity = capacityFor(measureIndex);
         if (cursor == capacity) {
           measureIndex++;
           cursor = 0;
           notesByMeasure.add([]);
           continuesFromPreviousMeasure = !firstPart;
         }
-        final available = capacity - cursor;
+        final available = capacityFor(measureIndex) - cursor;
         final measurePart = remaining < available ? remaining : available;
         final durations = _decomposeDuration(measurePart);
         for (final indexedDuration in durations.indexed) {
@@ -91,13 +98,22 @@ class MeasureBuilder {
         continuesFromPreviousMeasure = false;
       }
     }
-    if (cursor == capacity) {
+    if (cursor == capacityFor(measureIndex) && addTrailingMeasure) {
+      notesByMeasure.add([]);
+    }
+    while (notesByMeasure.length < measureTemplates.length) {
       notesByMeasure.add([]);
     }
     return [
       for (var index = 0; index < notesByMeasure.length; index++)
         Measure(
           index: index,
+          beatsPerMeasure: index < measureTemplates.length
+              ? measureTemplates[index].beatsPerMeasure
+              : null,
+          beatUnit: index < measureTemplates.length
+              ? measureTemplates[index].beatUnit
+              : null,
           notes: _applyMeasureAccidentals(notesByMeasure[index], keySignature),
         ),
     ];

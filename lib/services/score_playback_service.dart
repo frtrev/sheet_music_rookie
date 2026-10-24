@@ -135,6 +135,11 @@ class PianoWaveSynthesizer {
       sampleRate: sampleRate,
       tempoBpm: composition.tempoBpm,
       beatsPerMeasure: composition.beatsPerMeasure,
+      accentedBeatIndices: {
+        for (var index = 0; index < composition.measures.length; index++)
+          if (composition.measureStartTick(index) % 480 == 0)
+            composition.measureStartTick(index) ~/ 480,
+      },
       mode: composition.metronomeMode,
       gain: composition.metronomeVolume,
     );
@@ -143,11 +148,11 @@ class PianoWaveSynthesizer {
   }
 
   List<_Tone> _collectTones(Composition composition) {
-    final capacity = composition.beatsPerMeasure * 480;
     final tones = <_Tone>[];
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
-        final absoluteStart = measure.index * capacity + note.startTick;
+        final absoluteStart =
+            composition.measureStartTick(measure.index) + note.startTick;
         if (note.isRest) continue;
         if (note.tieFromPrevious &&
             tones.isNotEmpty &&
@@ -179,13 +184,14 @@ class PianoWaveSynthesizer {
   }
 
   int _scoreDurationTicks(Composition composition) {
-    final capacity = composition.beatsPerMeasure * 480;
     var result = 0;
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
         result = math.max(
           result,
-          measure.index * capacity + note.startTick + note.durationTicks,
+          composition.measureStartTick(measure.index) +
+              note.startTick +
+              note.durationTicks,
         );
       }
     }

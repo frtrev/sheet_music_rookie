@@ -12,6 +12,7 @@ import '../notation/score_renderer.dart';
 import '../services/composition_storage_service.dart';
 import '../services/metronome_service.dart';
 import '../services/practice_service.dart';
+import '../services/screen_awake_service.dart';
 import '../services/score_playback_service.dart';
 import '../transcription/transcription_engine.dart';
 import '../widgets/live_pitch_monitor.dart';
@@ -43,6 +44,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   late final ScorePlaybackService _playback;
   late final ScorePlaybackService _notePreview;
   late final MetronomeService _metronome;
+  final ScreenAwakeService _screenAwake = ScreenAwakeService();
   final CompositionStorageService _storage = CompositionStorageService();
   final ScrollController _scoreScroll = ScrollController();
   final ScrollController _pageScroll = ScrollController();
@@ -71,6 +73,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _notePreview = ScorePlaybackService();
     _metronome = MetronomeService();
     _playback.position.addListener(_playbackPositionChanged);
+    _playback.isPlaying.addListener(_transportWakeStateChanged);
     _engine.composition.addListener(_compositionChanged);
     _engine.notationCursorTick.addListener(_notationCursorChanged);
     _engine.microphoneStatus.addListener(_microphoneStatusChanged);
@@ -88,6 +91,23 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         status == MicrophoneStatus.unavailable) {
       unawaited(_metronome.stop());
     }
+    _syncScreenAwake();
+  }
+
+  void _transportWakeStateChanged() => _syncScreenAwake();
+
+  void _syncScreenAwake() {
+    final status = _engine.microphoneStatus.value;
+    final recording =
+        status == MicrophoneStatus.starting ||
+        status == MicrophoneStatus.listening ||
+        status == MicrophoneStatus.voiceDetected ||
+        status == MicrophoneStatus.silence;
+    _screenAwake.update(
+      recording: recording,
+      playing: _playback.isPlaying.value,
+      practicing: _practiceActive,
+    );
   }
 
   void _practicePitchChanged() {
@@ -375,6 +395,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _practiceProgress.value = 0;
     _pausedByUser = true;
     if (mounted) setState(() => _practiceActive = true);
+    _syncScreenAwake();
     _engine.notationCursorTick.value = session.currentTarget!.startTick;
     await _engine.startListening();
     await _syncMetronome();
@@ -383,6 +404,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   Future<void> _stopPractice({bool completed = false}) async {
     if (!_practiceActive) return;
     if (mounted) setState(() => _practiceActive = false);
+    _syncScreenAwake();
     _practiceSession = null;
     _practiceProgress.value = 0;
     await _engine.pauseListening();
@@ -604,6 +626,83 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       ),
     );
     if (result != null) _engine.setKeySignature(result);
+  }
+
+  Future<void> _showTimeSignatureDialog() async {
+    final composition = _engine.composition.value;
+    if (composition.measures.isEmpty) return;
+    final selectedTick = _engine.notationCursorTick.value;
+    final measureIndex = composition.measureIndexAtTick(selectedTick);
+    final measure = composition.measures[measureIndex];
+    var beats = measure.effectiveBeats(composition.beatsPerMeasure);
+    var beatUnit = measure.effectiveBeatUnit(composition.beatUnit);
+    final result = await showDialog<(int, int)>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Measure ${measureIndex + 1} time signature'),
+          content: Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  initialValue: beats,
+                  decoration: const InputDecoration(labelText: 'Beats'),
+                  items: [
+                    for (var value = 1; value <= 32; value++)
+                      DropdownMenuItem(value: value, child: Text('$value')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => beats = value);
+                  },
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14),
+                child: Text('/', style: TextStyle(fontSize: 28)),
+              ),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  initialValue: beatUnit,
+                  decoration: const InputDecoration(labelText: 'Note value'),
+                  items: [
+                    for (final value in const [1, 2, 4, 8, 16])
+                      DropdownMenuItem(value: value, child: Text('$value')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => beatUnit = value);
+                  },
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, (beats, beatUnit)),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    if (_practiceActive) await _stopPractice();
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    final status = _engine.microphoneStatus.value;
+    if (status != MicrophoneStatus.paused &&
+        status != MicrophoneStatus.unavailable) {
+      _pausedByUser = true;
+      await _pauseRecording();
+    }
+    _engine.setMeasureTimeSignatureAtTick(
+      selectedTick,
+      beatsPerMeasure: result.$1,
+      beatUnit: result.$2,
+    );
   }
 
   Future<void> _showVolumeDialog() async {
@@ -931,12 +1030,19 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           children: [
             ValueListenableBuilder<Composition>(
               valueListenable: _engine.composition,
-              builder: (context, composition, _) => _CompositionHeader(
-                composition: composition,
-                onKeySignaturePressed: _showKeySignatureDialog,
-                onVolumesPressed: _showVolumeDialog,
-                onMetronomeChanged: (mode) =>
-                    unawaited(_changeMetronomeMode(mode)),
+              builder: (context, composition, _) => ValueListenableBuilder<int>(
+                valueListenable: _engine.notationCursorTick,
+                builder: (context, cursorTick, _) => _CompositionHeader(
+                  composition: composition,
+                  selectedMeasureIndex: composition.measureIndexAtTick(
+                    cursorTick,
+                  ),
+                  onKeySignaturePressed: _showKeySignatureDialog,
+                  onTimeSignaturePressed: _showTimeSignatureDialog,
+                  onVolumesPressed: _showVolumeDialog,
+                  onMetronomeChanged: (mode) =>
+                      unawaited(_changeMetronomeMode(mode)),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -1111,12 +1217,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.microphoneStatus.removeListener(_microphoneStatusChanged);
     _engine.livePitch.removeListener(_practicePitchChanged);
     _playback.position.removeListener(_playbackPositionChanged);
+    _playback.isPlaying.removeListener(_transportWakeStateChanged);
     _scoreScroll.dispose();
     _pageScroll.dispose();
     _practiceProgress.dispose();
     unawaited(_playback.dispose());
     unawaited(_notePreview.dispose());
     unawaited(_metronome.dispose());
+    unawaited(_screenAwake.dispose());
     unawaited(_engine.dispose());
     super.dispose();
   }
@@ -1406,12 +1514,16 @@ class _NoteEditControls extends StatelessWidget {
 class _CompositionHeader extends StatelessWidget {
   const _CompositionHeader({
     required this.composition,
+    required this.selectedMeasureIndex,
     required this.onKeySignaturePressed,
+    required this.onTimeSignaturePressed,
     required this.onVolumesPressed,
     required this.onMetronomeChanged,
   });
   final Composition composition;
+  final int selectedMeasureIndex;
   final VoidCallback onKeySignaturePressed;
+  final VoidCallback onTimeSignaturePressed;
   final VoidCallback onVolumesPressed;
   final ValueChanged<MetronomeMode> onMetronomeChanged;
 
@@ -1431,9 +1543,15 @@ class _CompositionHeader extends StatelessWidget {
         onPressed: onKeySignaturePressed,
         visualDensity: VisualDensity.compact,
       ),
-      _chip(
-        Icons.timer_outlined,
-        '${composition.beatsPerMeasure}/${composition.beatUnit}',
+      ActionChip(
+        avatar: const Icon(Icons.timer_outlined, size: 16),
+        label: Text(
+          'Measure ${selectedMeasureIndex + 1}: '
+          '${composition.measures[selectedMeasureIndex].effectiveBeats(composition.beatsPerMeasure)}/'
+          '${composition.measures[selectedMeasureIndex].effectiveBeatUnit(composition.beatUnit)}',
+        ),
+        onPressed: onTimeSignaturePressed,
+        visualDensity: VisualDensity.compact,
       ),
       _chip(Icons.speed, '${composition.tempoBpm} BPM'),
       _chip(

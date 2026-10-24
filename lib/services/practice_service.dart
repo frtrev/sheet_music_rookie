@@ -92,12 +92,12 @@ class PracticeSession {
   }
 
   static List<PracticeTarget> _targetsFor(Composition composition) {
-    final capacity = composition.beatsPerMeasure * 480;
     final targets = <PracticeTarget>[];
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
         if (note.isRest) continue;
-        final startTick = measure.index * capacity + note.startTick;
+        final startTick =
+            composition.measureStartTick(measure.index) + note.startTick;
         final soundingPitch = playbackMidiPitch(
           composition,
           note.midiPitch,
@@ -133,13 +133,14 @@ class PracticeSession {
   }
 
   static int _scoreEndTick(Composition composition) {
-    final capacity = composition.beatsPerMeasure * 480;
     var end = 0;
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
         end = math.max(
           end,
-          measure.index * capacity + note.startTick + note.durationTicks,
+          composition.measureStartTick(measure.index) +
+              note.startTick +
+              note.durationTicks,
         );
       }
     }

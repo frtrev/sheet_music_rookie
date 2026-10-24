@@ -13,10 +13,19 @@ class ScoreLayout {
   static const staffTop = 96.0;
   static const left = 72.0;
 
-  static double contentStart(Composition composition, int measureIndex) =>
-      measureIndex == 0
-      ? 54 + composition.keySignature.accidentalCount.abs() * 7.5
-      : 14;
+  static double contentStart(Composition composition, int measureIndex) {
+    if (measureIndex == 0) {
+      return 54 + composition.keySignature.accidentalCount.abs() * 7.5;
+    }
+    final measure = composition.measures[measureIndex];
+    final previous = composition.measures[measureIndex - 1];
+    final changed =
+        measure.effectiveBeats(composition.beatsPerMeasure) !=
+            previous.effectiveBeats(composition.beatsPerMeasure) ||
+        measure.effectiveBeatUnit(composition.beatUnit) !=
+            previous.effectiveBeatUnit(composition.beatUnit);
+    return changed ? 44 : 14;
+  }
 
   static Offset noteCenter(
     Composition composition,
@@ -29,7 +38,9 @@ class ScoreLayout {
         left +
         measureIndex * measureWidth +
         start +
-        usable * note.startTick / (composition.beatsPerMeasure * 480);
+        usable *
+            note.startTick /
+            composition.measureCapacityTicks(measureIndex);
     final bottom = staffTop + 4 * lineGap;
     final y = note.isRest
         ? staffTop + 2 * lineGap
@@ -70,13 +81,14 @@ class ScoreLayout {
       Duration(microseconds: (ticks * 60000000 / (tempoBpm * 480)).round());
 
   static int scoreEndTick(Composition composition) {
-    final capacity = composition.beatsPerMeasure * 480;
     var endTick = 0;
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
         endTick = math.max(
           endTick,
-          measure.index * capacity + note.startTick + note.durationTicks,
+          composition.measureStartTick(measure.index) +
+              note.startTick +
+              note.durationTicks,
         );
       }
     }
@@ -84,16 +96,14 @@ class ScoreLayout {
   }
 
   static int editableEndTick(Composition composition) =>
-      math.max(1, composition.measures.length) *
-      composition.beatsPerMeasure *
-      480;
+      composition.editableEndTick;
 
   static int tickAtX(Composition composition, double x) {
-    final capacity = composition.beatsPerMeasure * 480;
     final rawMeasureIndex = ((x - left) / measureWidth).floor();
     final measureIndex = rawMeasureIndex
         .clamp(0, math.max(0, composition.measures.length - 1))
         .toInt();
+    final capacity = composition.measureCapacityTicks(measureIndex);
     final start = contentStart(composition, measureIndex);
     final usable = measureWidth - start - 14;
     final localX = x - left - measureIndex * measureWidth - start;
@@ -101,22 +111,22 @@ class ScoreLayout {
     final localTick = ((unsnappedTick / 120).round() * 120)
         .clamp(0, capacity)
         .toInt();
-    return (measureIndex * capacity + localTick)
+    return (composition.measureStartTick(measureIndex) + localTick)
         .clamp(0, editableEndTick(composition))
         .toInt();
   }
 
   static double cursorX(Composition composition, int absoluteTick) {
-    final capacity = composition.beatsPerMeasure * 480;
     final boundedTick = absoluteTick
         .clamp(0, editableEndTick(composition))
         .toInt();
-    final rawMeasureIndex = boundedTick ~/ capacity;
     final maxMeasureIndex = math.max(0, composition.measures.length - 1);
-    final measureIndex = rawMeasureIndex.clamp(0, maxMeasureIndex);
-    final localTick = rawMeasureIndex > maxMeasureIndex
-        ? capacity
-        : boundedTick % capacity;
+    final measureIndex = composition
+        .measureIndexAtTick(boundedTick)
+        .clamp(0, maxMeasureIndex);
+    final capacity = composition.measureCapacityTicks(measureIndex);
+    final localTick = (boundedTick - composition.measureStartTick(measureIndex))
+        .clamp(0, capacity);
     final start = contentStart(composition, measureIndex);
     final usable = measureWidth - start - 14;
     return left +
@@ -272,10 +282,10 @@ class PracticeProgressPainter extends CustomPainter {
   }
 
   Offset? _targetCenter() {
-    final capacity = composition.beatsPerMeasure * 480;
     for (final measure in composition.measures) {
       for (final note in measure.notes) {
-        final absoluteTick = measure.index * capacity + note.startTick;
+        final absoluteTick =
+            composition.measureStartTick(measure.index) + note.startTick;
         if (!note.isRest && absoluteTick == targetTick) {
           return ScoreLayout.noteCenter(composition, measure.index, note);
         }
@@ -347,9 +357,13 @@ class ScorePainter extends CustomPainter {
         weight: FontWeight.w700,
       );
     }
+    final firstMeasure = composition.measures.isEmpty
+        ? null
+        : composition.measures.first;
     _drawText(
       canvas,
-      '${composition.beatsPerMeasure}\n${composition.beatUnit}',
+      '${firstMeasure?.effectiveBeats(composition.beatsPerMeasure) ?? composition.beatsPerMeasure}\n'
+      '${firstMeasure?.effectiveBeatUnit(composition.beatUnit) ?? composition.beatUnit}',
       const Offset(72, 93),
       22,
       height: .72,
@@ -372,6 +386,24 @@ class ScorePainter extends CustomPainter {
 
     final selectedSources = _selectedSourceEvents();
     for (final measure in composition.measures) {
+      if (measure.index > 0) {
+        final previous = composition.measures[measure.index - 1];
+        final beats = measure.effectiveBeats(composition.beatsPerMeasure);
+        final unit = measure.effectiveBeatUnit(composition.beatUnit);
+        if (beats != previous.effectiveBeats(composition.beatsPerMeasure) ||
+            unit != previous.effectiveBeatUnit(composition.beatUnit)) {
+          _drawText(
+            canvas,
+            '$beats\n$unit',
+            Offset(
+              ScoreLayout.left + measure.index * ScoreLayout.measureWidth + 7,
+              93,
+            ),
+            19,
+            height: .72,
+          );
+        }
+      }
       for (final note in measure.notes) {
         _drawNote(canvas, measure.index, note, ink, selectedSources);
       }

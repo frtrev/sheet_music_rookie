@@ -159,6 +159,7 @@ void mixMetronomeClicks(
   required int tempoBpm,
   required int beatsPerMeasure,
   required MetronomeMode mode,
+  Set<int>? accentedBeatIndices,
   double gain = 1,
 }) {
   if (mode == MetronomeMode.off || samples.isEmpty) return;
@@ -168,7 +169,8 @@ void mixMetronomeClicks(
 
   for (var beat = 0; beat < beatCount; beat++) {
     final accented =
-        mode == MetronomeMode.accented && beat % beatsPerMeasure == 0;
+        mode == MetronomeMode.accented &&
+        (accentedBeatIndices?.contains(beat) ?? beat % beatsPerMeasure == 0);
     final frequency = accented ? 1650.0 : 1050.0;
     final amplitude = switch (mode) {
       MetronomeMode.accented => accented ? .78 : .46,

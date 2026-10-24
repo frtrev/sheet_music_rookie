@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
 
 import '../models/composition.dart';
+import '../models/measure.dart';
 import '../models/musical_note.dart';
 import '../models/raw_note_event.dart';
 import '../transcription/measure_builder.dart';
@@ -120,12 +121,27 @@ class CompositionStorageService {
     final tempo = data['tempoBpm'] as int;
     final beats = data['beatsPerMeasure'] as int;
     final beatUnit = data['beatUnit'] as int;
+    final storedMeasureSignatures = data['measureSignatures'] as List<dynamic>?;
+    final measureTemplates = storedMeasureSignatures == null
+        ? const <Measure>[]
+        : [
+            for (final (index, value) in storedMeasureSignatures.indexed)
+              Measure(
+                index: index,
+                beatsPerMeasure:
+                    (value as Map<String, dynamic>)['beatsPerMeasure'] as int,
+                beatUnit: value['beatUnit'] as int,
+              ),
+          ];
     final measures = const MeasureBuilder().build(
       rawEvents,
       tempo,
       beats,
+      beatUnit: beatUnit,
       octaveTranspositionSemitones: octaveRange.semitones,
       keySignature: keySignature,
+      measureTemplates: measureTemplates,
+      addTrailingMeasure: measureTemplates.isEmpty,
     );
     final composition = Composition(
       title: data['title'] as String,
@@ -225,6 +241,7 @@ class CompositionStorageService {
     var beatUnit = 4;
     var tempo = 120;
     var clef = ClefType.treble;
+    var octaveRange = OctaveRange.standard;
     var keySignature = KeySignature.cMajor;
 
     final divisionsText = document.findAllElements('divisions').firstOrNull;
@@ -238,14 +255,23 @@ class CompositionStorageService {
     keySignature = KeySignature.values.firstWhere(
       (key) => key.accidentalCount == fifths.clamp(-7, 7),
     );
-    final clefSign = document
-        .findAllElements('clef')
-        .firstOrNull
+    final firstClef = part.findAllElements('clef').firstOrNull;
+    final clefSign = firstClef
         ?.getElement('sign')
         ?.innerText
         .trim()
         .toUpperCase();
     if (clefSign == 'F') clef = ClefType.bass;
+    final clefOctaveChange = int.tryParse(
+      firstClef?.getElement('clef-octave-change')?.innerText.trim() ?? '',
+    );
+    octaveRange = switch (clefOctaveChange) {
+      -2 => OctaveRange.twoOctavesDown,
+      -1 => OctaveRange.octaveDown,
+      1 => OctaveRange.octaveUp,
+      2 => OctaveRange.twoOctavesUp,
+      _ => OctaveRange.standard,
+    };
     final soundTempo = document
         .findAllElements('sound')
         .map((element) => double.tryParse(element.getAttribute('tempo') ?? ''))
@@ -256,6 +282,63 @@ class CompositionStorageService {
           '',
     );
     tempo = ((soundTempo ?? metronomeTempo ?? tempo).round()).clamp(20, 400);
+
+    final xmlMeasures = part.findElements('measure').toList();
+    final measureTemplates = <Measure>[];
+    var activeBeats = beats;
+    var activeBeatUnit = beatUnit;
+    for (final (index, xmlMeasure) in xmlMeasures.indexed) {
+      final localBeats = xmlMeasure
+          .findElements('attributes')
+          .expand((attributes) => attributes.findElements('time'))
+          .expand((time) => time.findElements('beats'))
+          .firstOrNull;
+      final localBeatUnit = xmlMeasure
+          .findElements('attributes')
+          .expand((attributes) => attributes.findElements('time'))
+          .expand((time) => time.findElements('beat-type'))
+          .firstOrNull;
+      activeBeats = _positiveInt(localBeats?.innerText, fallback: activeBeats);
+      activeBeatUnit = _positiveInt(
+        localBeatUnit?.innerText,
+        fallback: activeBeatUnit,
+      );
+      var measureTicks = 0;
+      for (final note in xmlMeasure.findElements('note')) {
+        if (note.getElement('chord') != null ||
+            note.getElement('grace') != null) {
+          continue;
+        }
+        final voice = note.getElement('voice')?.innerText.trim();
+        if (primaryVoice != null && voice != null && voice != primaryVoice) {
+          continue;
+        }
+        final units = int.tryParse(
+          note.getElement('duration')?.innerText.trim() ?? '',
+        );
+        if (units != null && units > 0) {
+          measureTicks += (units * 480 / divisions).round();
+        }
+      }
+      var measureBeats = activeBeats;
+      var measureBeatUnit = activeBeatUnit;
+      final nominalTicks = activeBeats * 1920 ~/ activeBeatUnit;
+      if (index == 0 && measureTicks > 0 && measureTicks < nominalTicks) {
+        final inferred = _timeSignatureForTicks(
+          measureTicks,
+          preferredBeatUnit: activeBeatUnit,
+        );
+        measureBeats = inferred.$1;
+        measureBeatUnit = inferred.$2;
+      }
+      measureTemplates.add(
+        Measure(
+          index: index,
+          beatsPerMeasure: measureBeats,
+          beatUnit: measureBeatUnit,
+        ),
+      );
+    }
 
     final rawEvents = <RawNoteEvent>[];
     var timestampMs = 0;
@@ -301,10 +384,10 @@ class CompositionStorageService {
         final alter = double.tryParse(
           pitch?.getElement('alter')?.innerText.trim() ?? '0',
         );
-        midi = ((octave + 1) * 12 + natural + (alter ?? 0).round()).clamp(
-          0,
-          127,
-        );
+        final soundingMidi = (octave + 1) * 12 + natural + (alter ?? 0).round();
+        // MusicXML pitch data remains the sounding pitch. The transposing
+        // clef changes where that pitch is written on the staff.
+        midi = soundingMidi.clamp(0, 127);
         frequency = (440 * math.pow(2, (midi - 69) / 12)).toDouble();
       }
       final accidentalText = note
@@ -360,12 +443,17 @@ class CompositionStorageService {
       beatUnit: beatUnit,
       tempoBpm: tempo,
       clef: clef,
+      octaveRange: octaveRange,
       microphoneActive: false,
       measures: const MeasureBuilder().build(
         rawEvents,
         tempo,
         beats,
+        beatUnit: beatUnit,
+        octaveTranspositionSemitones: octaveRange.semitones,
         keySignature: keySignature,
+        measureTemplates: measureTemplates,
+        addTrailingMeasure: false,
       ),
     );
     return SavedComposition(
@@ -379,6 +467,17 @@ class CompositionStorageService {
   int _positiveInt(String? value, {required int fallback}) {
     final parsed = int.tryParse(value?.trim() ?? '');
     return parsed == null || parsed <= 0 ? fallback : parsed;
+  }
+
+  (int, int) _timeSignatureForTicks(
+    int ticks, {
+    required int preferredBeatUnit,
+  }) {
+    for (final unit in {preferredBeatUnit, 4, 8, 2, 16, 1}) {
+      final scaled = ticks * unit;
+      if (scaled % 1920 == 0) return (scaled ~/ 1920, unit);
+    }
+    return ((ticks / 480).ceil().clamp(1, 32).toInt(), 4);
   }
 
   Future<Directory> _storageDirectory() async {
@@ -416,6 +515,15 @@ class CompositionStorageService {
     'keySignatureFifths': composition.keySignature.accidentalCount,
     'beatsPerMeasure': composition.beatsPerMeasure,
     'beatUnit': composition.beatUnit,
+    'measureSignatures': [
+      for (final measure in composition.measures)
+        {
+          'beatsPerMeasure': measure.effectiveBeats(
+            composition.beatsPerMeasure,
+          ),
+          'beatUnit': measure.effectiveBeatUnit(composition.beatUnit),
+        },
+    ],
     'tempoBpm': composition.tempoBpm,
     'recordingMode': composition.recordingMode.name,
     'metronomeMode': composition.metronomeMode.name,
@@ -447,6 +555,10 @@ class CompositionStorageService {
   );
 
   String _musicXml(Composition composition) {
+    final clefOctaveChange = composition.octaveRange.semitones ~/ 12;
+    final clefOctaveXml = clefOctaveChange == 0
+        ? ''
+        : '<clef-octave-change>$clefOctaveChange</clef-octave-change>';
     final buffer = StringBuffer()
       ..writeln('<?xml version="1.0" encoding="UTF-8" standalone="no"?>')
       ..writeln(
@@ -463,30 +575,52 @@ class CompositionStorageService {
         '  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>',
       )
       ..writeln('  <part id="P1">');
+    int? previousBeats;
+    int? previousBeatUnit;
     for (final measure in composition.measures) {
-      buffer.writeln('    <measure number="${measure.index + 1}">');
-      if (measure.index == 0) {
-        buffer
-          ..writeln('      <attributes>')
-          ..writeln('        <divisions>480</divisions>')
-          ..writeln(
-            '        <key><fifths>${composition.keySignature.accidentalCount}</fifths><mode>major</mode></key>',
-          )
-          ..writeln(
-            '        <time><beats>${composition.beatsPerMeasure}</beats><beat-type>${composition.beatUnit}</beat-type></time>',
-          )
-          ..writeln(
-            '        <clef><sign>${composition.clef == ClefType.treble ? 'G' : 'F'}</sign><line>${composition.clef == ClefType.treble ? 2 : 4}</line></clef>',
-          )
-          ..writeln('      </attributes>')
-          ..writeln(
-            '      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${composition.tempoBpm}</per-minute></metronome></direction-type><sound tempo="${composition.tempoBpm}"/></direction>',
+      final measureBeats = measure.effectiveBeats(composition.beatsPerMeasure);
+      final measureBeatUnit = measure.effectiveBeatUnit(composition.beatUnit);
+      final pickup =
+          measure.index == 0 &&
+          (measureBeats != composition.beatsPerMeasure ||
+              measureBeatUnit != composition.beatUnit);
+      buffer.writeln(
+        '    <measure number="${measure.index + 1}"${pickup ? ' implicit="yes"' : ''}>',
+      );
+      final timeChanged =
+          measureBeats != previousBeats || measureBeatUnit != previousBeatUnit;
+      if (measure.index == 0 || timeChanged) {
+        buffer.writeln('      <attributes>');
+        if (measure.index == 0) {
+          buffer
+            ..writeln('        <divisions>480</divisions>')
+            ..writeln(
+              '        <key><fifths>${composition.keySignature.accidentalCount}</fifths><mode>major</mode></key>',
+            );
+        }
+        if (timeChanged) {
+          buffer.writeln(
+            '        <time><beats>$measureBeats</beats><beat-type>$measureBeatUnit</beat-type></time>',
           );
+        }
+        if (measure.index == 0) {
+          buffer.writeln(
+            '        <clef><sign>${composition.clef == ClefType.treble ? 'G' : 'F'}</sign><line>${composition.clef == ClefType.treble ? 2 : 4}</line>$clefOctaveXml</clef>',
+          );
+        }
+        buffer.writeln('      </attributes>');
+      }
+      if (measure.index == 0) {
+        buffer.writeln(
+          '      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${composition.tempoBpm}</per-minute></metronome></direction-type><sound tempo="${composition.tempoBpm}"/></direction>',
+        );
       }
       for (final note in measure.notes) {
         _writeMusicXmlNote(buffer, composition, note);
       }
       buffer.writeln('    </measure>');
+      previousBeats = measureBeats;
+      previousBeatUnit = measureBeatUnit;
     }
     buffer
       ..writeln('  </part>')
@@ -573,7 +707,9 @@ class CompositionStorageService {
     return (
       step: naturalNames[naturalPitchClass]!,
       alter: alter,
-      octave: naturalMidi ~/ 12 - 1,
+      // Transposing clefs export sounding pitch data while displaying the
+      // note at the app's written octave.
+      octave: naturalMidi ~/ 12 - 1 + composition.octaveRange.semitones ~/ 12,
     );
   }
 
