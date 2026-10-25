@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../audio/microphone_service.dart';
 import '../models/composition.dart';
@@ -46,6 +47,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   late final ScorePlaybackService _playback;
   late final ScorePlaybackService _notePreview;
   late final MetronomeService _metronome;
+  late final Ticker _testCursorTicker;
   final ScreenAwakeService _screenAwake = ScreenAwakeService();
   final CompositionStorageService _storage = CompositionStorageService();
   final ScrollController _scoreScroll = ScrollController();
@@ -79,6 +81,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _playback = ScorePlaybackService()..onComplete = _playbackCompleted;
     _notePreview = ScorePlaybackService();
     _metronome = MetronomeService();
+    _testCursorTicker = Ticker(_testCursorFrame);
     _playback.position.addListener(_playbackPositionChanged);
     _playback.isPlaying.addListener(_transportWakeStateChanged);
     _engine.composition.addListener(_compositionChanged);
@@ -121,16 +124,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       if (session != null) {
         final voiceDetected =
             _engine.microphoneStatus.value == MicrophoneStatus.voiceDetected;
-        final shouldStop = session.addFrame(
+        session.addFrame(
           frame,
           pitch: voiceDetected ? _engine.livePitch.value : null,
           voiceDetected: voiceDetected,
         );
-        final cursorTick = session.currentCursorTick;
-        if (cursorTick != null) {
-          _engine.notationCursorTick.value = cursorTick;
+        if (session.timelineStarted && !_testCursorTicker.isActive) {
+          _testCursorTicker.start();
         }
-        if (shouldStop) unawaited(_stopTest(showResults: true));
       }
       return;
     }
@@ -146,6 +147,17 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       timestampMs: frame.timestampMs,
     );
     _applyPracticeUpdate(session, update);
+  }
+
+  void _testCursorFrame(Duration elapsed) {
+    if (!_testActive || _testStopping) return;
+    final session = _testSession;
+    if (session == null || !session.timelineStarted) return;
+    _engine.notationCursorTick.value = session.cursorTickAt(elapsed);
+    if (session.hasReachedEnd(elapsed)) {
+      _testCursorTicker.stop();
+      unawaited(_stopTest(showResults: true));
+    }
   }
 
   void _syncPracticeSettings(PracticeSession session) {
@@ -518,6 +530,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     }
 
     if (_practiceActive) await _stopPractice();
+    _testCursorTicker.stop();
     await _notePreview.stop(resetPosition: true);
     await _stopPlayback(resumeListening: false, resetCursor: true);
     final status = _engine.microphoneStatus.value;
@@ -543,6 +556,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   Future<void> _stopTest({required bool showResults}) async {
     if (!_testActive || _testStopping) return;
     _testStopping = true;
+    _testCursorTicker.stop();
     final session = _testSession;
     if (mounted) setState(() => _testActive = false);
     _syncScreenAwake();
@@ -1342,7 +1356,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                                     ?.currentTarget
                                     ?.soundingMidiPitch
                               : beginnerTest
-                              ? _testSession?.currentExpectedMidiPitch
+                              ? _testSession?.expectedMidiPitchAtTick(
+                                  cursorTick,
+                                )
                               : null;
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1522,6 +1538,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _scoreScroll.dispose();
     _pageScroll.dispose();
     _practiceProgress.dispose();
+    _testCursorTicker.dispose();
     unawaited(_playback.dispose());
     unawaited(_notePreview.dispose());
     unawaited(_metronome.dispose());

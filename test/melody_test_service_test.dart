@@ -153,4 +153,13 @@ void main() {
     expect(session.currentCursorTick, 480);
     expect(session.currentExpectedMidiPitch, 69);
   });
+
+  test('display cursor timing advances independently of audio frames', () {
+    final session = MelodyTestSession(composition);
+
+    expect(session.cursorTickAt(const Duration(milliseconds: 250)), 240);
+    expect(session.cursorTickAt(const Duration(milliseconds: 500)), 480);
+    expect(session.hasReachedEnd(const Duration(milliseconds: 999)), isFalse);
+    expect(session.hasReachedEnd(const Duration(milliseconds: 1000)), isTrue);
+  });
 }

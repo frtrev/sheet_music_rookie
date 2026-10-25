@@ -50,11 +50,21 @@ class MelodyTestSession {
 
   int? get currentExpectedMidiPitch {
     final cursorTick = currentCursorTick;
-    final milliseconds = cursorTick == null
-        ? 0
-        : (cursorTick * 60000 / (composition.tempoBpm * 480)).round();
-    return _pitchAt(milliseconds);
+    return expectedMidiPitchAtTick(cursorTick ?? 0);
   }
+
+  int? expectedMidiPitchAtTick(int cursorTick) => _pitchAt(
+    (cursorTick * 60000 / (composition.tempoBpm * 480)).round(),
+  );
+
+  int cursorTickAt(Duration elapsed) =>
+      (elapsed.inMicroseconds * composition.tempoBpm * 480 / 60000000)
+          .round()
+          .clamp(0, _scoreEndTick)
+          .toInt();
+
+  bool hasReachedEnd(Duration elapsed) =>
+      cursorTickAt(elapsed) >= _scoreEndTick;
 
   int? get currentCursorTick {
     if (_attemptStartMs == null || _lastFrameMs == null) return null;
