@@ -26,6 +26,30 @@ void main() {
     expect(find.text('8 up'), findsOneWidget);
   });
 
+  testWidgets('home remains usable on a small screen with enlarged text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+        child: const SheetMusicRookieApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await tester.ensureVisible(find.text('Settings'));
+    expect(find.text('Settings').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.text('Create'));
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a clef'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('settings begin with the three practice controls', (
     tester,
   ) async {

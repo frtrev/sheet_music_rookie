@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'app_theme.dart';
+
 import 'package:flutter/material.dart';
 
 import '../screens/score_editor_screen.dart';
@@ -80,22 +82,12 @@ class _SheetMusicRookieAppState extends State<SheetMusicRookieApp> {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xff315b4c);
     return MaterialApp(
       navigatorKey: _navigatorKey,
       scaffoldMessengerKey: _messengerKey,
       title: 'Sheet Music Rookie',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: seed),
-        scaffoldBackgroundColor: const Color(0xfff7f4ed),
-        cardTheme: const CardThemeData(
-          elevation: 0,
-          color: Color(0xfffffdf8),
-          margin: EdgeInsets.zero,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light,
       home: const HomeScreen(),
     );
   }

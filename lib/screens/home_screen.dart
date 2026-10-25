@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../app/app_theme.dart';
 import '../models/composition.dart';
 import '../services/composition_storage_service.dart';
 import 'score_editor_screen.dart';
@@ -11,73 +12,150 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.music_note_rounded,
-                    size: 58,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Sheet Music Rookie',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.displaySmall
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sing it. See it. Shape it.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium
-                        ?.copyWith(color: Colors.black54),
-                  ),
-                  const SizedBox(height: 48),
-                  FilledButton.icon(
-                    onPressed: () => _chooseClef(context),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.all(18),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xffe1faff), AppTheme.background, Color(0xffeeecff)],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 28,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Center(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(30),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.blue.withValues(alpha: .2),
+                                    blurRadius: 32,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(30),
+                                child: Image.asset(
+                                  'assets/app_icon/app-store-1024.png',
+                                  width: 112,
+                                  height: 112,
+                                  excludeFromSemantics: true,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Sheet Music Rookie',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.headlineLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Sing it. See it. Shape it.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.gradient,
+                              borderRadius: BorderRadius.circular(26),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.graphic_eq_rounded,
+                                  color: AppTheme.cyan,
+                                  size: 32,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'Your voice. Your music.',
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Turn a melody into sheet music, one note at a time.',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: () => _chooseClef(context),
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppTheme.blue,
+                                    ),
+                                    icon: const Icon(Icons.add_rounded),
+                                    label: const Text('Create'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: () => _openSaved(context),
+                            icon: const Icon(Icons.folder_open_rounded),
+                            label: const Text('Open'),
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SettingsScreen(),
+                              ),
+                            ),
+                            icon: const Icon(Icons.tune_rounded),
+                            label: const Text('Settings'),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Offline • No account required',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.muted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => _openSaved(context),
-                    icon: const Icon(Icons.folder_open),
-                    label: const Text('Open'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.all(18),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
-                    icon: const Icon(Icons.tune),
-                    label: const Text('Settings'),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.all(18),
-                    ),
-                  ),
-                  const SizedBox(height: 34),
-                  const Text(
-                    'Offline • No account required',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black45),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -91,36 +169,38 @@ class HomeScreen extends StatelessWidget {
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Choose a clef',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ClefButton(
-                      symbol: '𝄞',
-                      label: 'Treble Clef',
-                      onTap: () => Navigator.pop(context, ClefType.treble),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Choose a clef',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ClefButton(
+                        symbol: '𝄞',
+                        label: 'Treble Clef',
+                        onTap: () => Navigator.pop(context, ClefType.treble),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ClefButton(
-                      symbol: '𝄢',
-                      label: 'Bass Clef',
-                      onTap: () => Navigator.pop(context, ClefType.bass),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ClefButton(
+                        symbol: '𝄢',
+                        label: 'Bass Clef',
+                        onTap: () => Navigator.pop(context, ClefType.bass),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

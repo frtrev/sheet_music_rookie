@@ -127,7 +127,7 @@ class _Metric extends StatelessWidget {
       Text(
         label,
         style: Theme.of(context).textTheme.labelSmall
-            ?.copyWith(color: Colors.black54),
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
       const SizedBox(height: 2),
       Text(
@@ -146,8 +146,9 @@ class _StatusDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      MicrophoneStatus.voiceDetected => Colors.orange,
-      MicrophoneStatus.listening || MicrophoneStatus.silence => Colors.green,
+      MicrophoneStatus.voiceDetected => Theme.of(context).colorScheme.primary,
+      MicrophoneStatus.listening ||
+      MicrophoneStatus.silence => Theme.of(context).colorScheme.secondary,
       MicrophoneStatus.unavailable => Colors.red,
       _ => Colors.grey,
     };
