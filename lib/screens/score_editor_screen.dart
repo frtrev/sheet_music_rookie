@@ -171,7 +171,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   void _applyPracticeUpdate(PracticeSession session, PracticeUpdate? update) {
     _practiceProgress.value = session.progress;
     if (update == null) return;
-    _engine.notationCursorTick.value = update.cursorTick;
+    _engine.notationCursorTick.value = session.sourceTickAt(update.cursorTick);
     if (update.completed) unawaited(_stopPractice(completed: true));
   }
 
@@ -243,7 +243,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     // Ignore native stop/reset events so they cannot jump the selection to 0.
     if (!_playback.isPlaying.value) return;
     final composition = _engine.composition.value;
-    final ticks = ScoreLayout.ticksAt(
+    final ticks = _playback.scoreTickAt(
       _playback.position.value,
       composition.tempoBpm,
     );
@@ -426,9 +426,6 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _engine.notationCursorTick.value = 0;
     }
     final startAt = ScoreLayout.durationAt(startTick, composition.tempoBpm);
-    if (_playback.position.value != startAt) {
-      await _playback.seek(startAt);
-    }
     final started = await _playback.play(composition, startAt: startAt);
     if (!started) await _resumeAfterPlaybackIfNeeded();
   }
@@ -492,7 +489,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _pausedByUser = true;
     if (mounted) setState(() => _practiceActive = true);
     _syncScreenAwake();
-    _engine.notationCursorTick.value = session.currentTarget!.startTick;
+    _engine.notationCursorTick.value = session.sourceTickAt(
+      session.currentTarget!.startTick,
+    );
     await _engine.startListening();
     await _syncMetronome();
   }
@@ -659,7 +658,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       } else {
         _engine.notationCursorTick.value = tick;
       }
-      await _playback.seek(position);
+      await _playback.seekScore(position, _engine.composition.value.tempoBpm);
     } finally {
       _manualCursorMoveInProgress = false;
     }
@@ -1396,9 +1395,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                                     composition.tempoBpm,
                                   ),
                                   showPlaybackCursor: true,
-                                  practiceTargetTick: _practiceSession
-                                      ?.currentTarget
-                                      ?.startTick,
+                                  practiceTargetTick:
+                                      _practiceSession?.currentTarget == null
+                                      ? null
+                                      : _practiceSession!.sourceTickAt(
+                                          _practiceSession!
+                                              .currentTarget!
+                                              .startTick,
+                                        ),
                                   practiceProgress: _practiceProgress,
                                   cursorFollowFraction: _engine
                                       .settings

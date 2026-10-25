@@ -6,12 +6,16 @@ class Measure {
     this.notes = const [],
     this.beatsPerMeasure,
     this.beatUnit,
+    this.barlines = const [],
   });
 
   final int index;
   final List<MusicalNote> notes;
   final int? beatsPerMeasure;
   final int? beatUnit;
+
+  /// Original MusicXML barlines, including repeat and numbered-ending marks.
+  final List<String> barlines;
 
   int effectiveBeats(int fallback) => beatsPerMeasure ?? fallback;
 

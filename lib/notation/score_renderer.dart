@@ -2,9 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:xml/xml.dart';
 
 import '../models/composition.dart';
 import '../models/musical_note.dart';
+import '../models/measure.dart';
 import '../models/note_lyric.dart';
 import 'rest_symbol.dart';
 
@@ -16,6 +18,11 @@ class _LayoutCache {
   double? height;
   List<({int tick, double x})>? cursorAnchors;
 }
+
+final _measureBarlines = Expando<List<XmlElement>>();
+List<XmlElement> _barlines(Measure measure) => _measureBarlines[measure] ??= [
+  for (final xml in measure.barlines) XmlDocument.parse(xml).rootElement,
+];
 
 final _lyricText = Expando<TextPainter>();
 TextPainter _lyricPainter(NoteLyric lyric) =>
@@ -592,6 +599,7 @@ class ScorePainter extends CustomPainter {
     );
     _drawKeySignature(canvas);
 
+    _drawRepeatMarks(canvas);
     final selectedSources = _selectedSourceEvents();
     for (final measure in composition.measures) {
       if (measure.index > 0) {
@@ -622,6 +630,72 @@ class ScorePainter extends CustomPainter {
     }
     _drawLyrics(canvas);
     if (showPlaybackCursor) _drawPlaybackCursor(canvas);
+  }
+
+  void _drawRepeatMarks(Canvas canvas) {
+    var inEnding = false;
+    final paint = Paint()
+      ..color = const Color(0xff10254f)
+      ..strokeWidth = 1.5;
+    for (final measure in composition.measures) {
+      final left = ScoreLayout.measureLeft(composition, measure.index);
+      final right = ScoreLayout.measureLeft(composition, measure.index + 1);
+      var closesEnding = false;
+      for (final bar in _barlines(measure)) {
+        for (final ending in bar.findElements('ending')) {
+          if (ending.getAttribute('type') == 'start') {
+            inEnding = true;
+            _drawText(
+              canvas,
+              '${ending.getAttribute('number') ?? ''}.',
+              Offset(left + 8, 50),
+              12,
+              weight: FontWeight.w600,
+            );
+            canvas.drawLine(Offset(left + 3, 70), Offset(left + 3, 80), paint);
+          } else {
+            closesEnding = true;
+            if (ending.getAttribute('type') == 'stop') {
+              canvas.drawLine(
+                Offset(right - 3, 70),
+                Offset(right - 3, 80),
+                paint,
+              );
+            }
+          }
+        }
+        for (final repeat in bar.findElements('repeat')) {
+          final forward = repeat.getAttribute('direction') == 'forward';
+          final x = forward ? left + 4 : right - 4;
+          canvas.drawLine(
+            Offset(x, ScoreLayout.staffTop),
+            Offset(x, ScoreLayout.staffTop + 56),
+            paint..strokeWidth = 3,
+          );
+          final thin = x + (forward ? 5 : -5);
+          canvas.drawLine(
+            Offset(thin, ScoreLayout.staffTop),
+            Offset(thin, ScoreLayout.staffTop + 56),
+            paint..strokeWidth = 1.2,
+          );
+          final dots = x + (forward ? 11 : -11);
+          for (final y in [
+            ScoreLayout.staffTop + 21,
+            ScoreLayout.staffTop + 35,
+          ]) {
+            canvas.drawCircle(Offset(dots, y), 2.5, paint);
+          }
+        }
+      }
+      if (inEnding) {
+        canvas.drawLine(
+          Offset(left + 3, 70),
+          Offset(right - 3, 70),
+          paint..strokeWidth = 1.2,
+        );
+      }
+      if (closesEnding) inEnding = false;
+    }
   }
 
   void _drawLyrics(Canvas canvas) {

@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/composition.dart';
+import '../music/performance_plan.dart';
 import '../models/musical_note.dart';
 import 'metronome_service.dart';
 
@@ -20,7 +21,24 @@ class ScorePlaybackService {
     });
   }
 
+  PerformancePlan? _plan;
   final AudioPlayer _player;
+
+  int scoreTickAt(Duration elapsed, int tempoBpm) {
+    final tick = (elapsed.inMicroseconds * tempoBpm * 480 / 60000000).round();
+    return _plan?.sourceTickAt(tick) ?? tick;
+  }
+
+  Future<void> seekScore(Duration target, int tempoBpm) async {
+    final tick = (target.inMicroseconds * tempoBpm * 480 / 60000000).round();
+    final current = (position.value.inMicroseconds * tempoBpm * 480 / 60000000)
+        .round();
+    final performed = _plan?.performanceTickAt(tick, nearTick: current) ?? tick;
+    await seek(
+      Duration(microseconds: (performed * 60000000 / (tempoBpm * 480)).round()),
+    );
+  }
+
   late final StreamSubscription<void> _completionSubscription;
   late final StreamSubscription<Duration> _positionSubscription;
   final ValueNotifier<bool> isPlaying = ValueNotifier(false);
@@ -31,7 +49,16 @@ class ScorePlaybackService {
     Composition composition, {
     Duration startAt = Duration.zero,
   }) async {
-    final bytes = await compute(_renderPianoWave, composition);
+    final plan = PerformancePlan(composition);
+    final performedTick = plan.performanceTickAt(
+      (startAt.inMicroseconds * composition.tempoBpm * 480 / 60000000).round(),
+    );
+    startAt = Duration(
+      microseconds: (performedTick * 60000000 / (composition.tempoBpm * 480))
+          .round(),
+    );
+    final bytes = await compute(_renderPianoWave, plan.expanded);
+    _plan = plan;
     if (bytes == null) return false;
     await _player.stop();
     position.value = startAt;
@@ -46,6 +73,7 @@ class ScorePlaybackService {
 
   Future<bool> playWave(Uint8List bytes) async {
     if (bytes.isEmpty) return false;
+    _plan = null;
     await _player.stop();
     position.value = Duration.zero;
     await _player.setReleaseMode(ReleaseMode.stop);
@@ -102,7 +130,8 @@ class PianoWaveSynthesizer {
 
   final int sampleRate;
 
-  Uint8List? render(Composition composition) {
+  Uint8List? render(Composition source) {
+    final composition = PerformancePlan(source).expanded;
     final tones = _collectTones(composition);
     final totalTicks = _scoreDurationTicks(composition);
     if (totalTicks == 0) return null;

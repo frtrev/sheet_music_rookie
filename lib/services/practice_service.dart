@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../models/composition.dart';
+import '../music/performance_plan.dart';
 import '../models/pitch_detection_result.dart';
 import '../models/voice_detection_settings.dart';
 import 'score_playback_service.dart';
@@ -40,16 +41,35 @@ class PracticeUpdate {
 /// Advances through a monophonic score when the expected sounding pitch has
 /// been held long enough. It intentionally does not own microphone or UI state.
 class PracticeSession {
-  PracticeSession(
-    this.composition, {
+  factory PracticeSession(
+    Composition source, {
+    required int pitchStabilityMs,
+    double pitchToleranceCents = 45,
+    int articulationGapMs = 35,
+    PracticeDifficulty difficulty = PracticeDifficulty.beginner,
+    double requiredDurationFraction = .6,
+  }) => PracticeSession._(
+    PerformancePlan(source),
+    pitchStabilityMs: pitchStabilityMs,
+    pitchToleranceCents: pitchToleranceCents,
+    articulationGapMs: articulationGapMs,
+    difficulty: difficulty,
+    requiredDurationFraction: requiredDurationFraction,
+  );
+
+  PracticeSession._(
+    this.plan, {
     required this.pitchStabilityMs,
-    this.pitchToleranceCents = 45,
-    this.articulationGapMs = 35,
-    this.difficulty = PracticeDifficulty.beginner,
-    this.requiredDurationFraction = .6,
-  }) : targets = _targetsFor(composition);
+    required this.pitchToleranceCents,
+    required this.articulationGapMs,
+    required this.difficulty,
+    required this.requiredDurationFraction,
+  }) : composition = plan.expanded,
+       targets = _targetsFor(plan.expanded);
 
   final Composition composition;
+  final PerformancePlan plan;
+  int sourceTickAt(int tick) => plan.sourceTickAt(tick);
   final int pitchStabilityMs;
   double pitchToleranceCents;
   int articulationGapMs;

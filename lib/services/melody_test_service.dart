@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../audio/microphone_service.dart';
 import '../audio/voice_polish.dart';
 import '../models/composition.dart';
+import '../music/performance_plan.dart';
 import '../models/pitch_detection_result.dart';
 import 'score_playback_service.dart';
 
@@ -26,15 +27,27 @@ class MelodyTestResult {
 /// that overlays the optionally polished voice with the same piano reference used by
 /// normal score playback.
 class MelodyTestSession {
-  MelodyTestSession(
-    this.composition, {
-    this.outputSampleRate = 24000,
-    this.voicePolish = 0,
-  }) : _expected = _expectedSpans(composition),
-       _startsWithRest = _scoreStartsWithRest(composition),
-       _scoreEndTick = _scoreDurationTicks(composition);
+  factory MelodyTestSession(
+    Composition source, {
+    int outputSampleRate = 24000,
+    double voicePolish = 0,
+  }) => MelodyTestSession._(
+    PerformancePlan(source),
+    outputSampleRate: outputSampleRate,
+    voicePolish: voicePolish,
+  );
+
+  MelodyTestSession._(
+    this.plan, {
+    required this.outputSampleRate,
+    required this.voicePolish,
+  }) : composition = plan.expanded,
+       _expected = _expectedSpans(plan.expanded),
+       _startsWithRest = _scoreStartsWithRest(plan.expanded),
+       _scoreEndTick = _scoreDurationTicks(plan.expanded);
 
   final Composition composition;
+  final PerformancePlan plan;
   final int outputSampleRate;
   final double voicePolish;
   final List<_ExpectedSpan> _expected;
@@ -57,26 +70,32 @@ class MelodyTestSession {
     return expectedMidiPitchAtTick(cursorTick ?? 0);
   }
 
-  int? expectedMidiPitchAtTick(int cursorTick) =>
-      _pitchAt((cursorTick * 60000 / (composition.tempoBpm * 480)).round());
+  int? expectedMidiPitchAtTick(int cursorTick) => _pitchAt(
+    (plan.performanceTickAt(cursorTick) * 60000 / (composition.tempoBpm * 480))
+        .round(),
+  );
 
-  int cursorTickAt(Duration elapsed) =>
+  int _performanceTickAt(Duration elapsed) =>
       (elapsed.inMicroseconds * composition.tempoBpm * 480 / 60000000)
           .round()
           .clamp(0, _scoreEndTick)
           .toInt();
 
-  bool hasReachedEnd(Duration elapsed) =>
-      cursorTickAt(elapsed) >= _scoreEndTick;
+  int cursorTickAt(Duration elapsed) =>
+      plan.sourceTickAt(_performanceTickAt(elapsed));
 
-  int? get currentCursorTick {
+  bool hasReachedEnd(Duration elapsed) =>
+      _performanceTickAt(elapsed) >= _scoreEndTick;
+
+  int? get _currentPerformanceTick {
     if (_attemptStartMs == null || _lastFrameMs == null) return null;
     final elapsedMs = math.max(0, _lastFrameMs! - _attemptStartMs!);
-    return (elapsedMs * composition.tempoBpm * 480 / 60000)
-        .round()
-        .clamp(0, _scoreEndTick)
-        .toInt();
+    return _performanceTickAt(Duration(milliseconds: elapsedMs));
   }
+
+  int? get currentCursorTick => _currentPerformanceTick == null
+      ? null
+      : plan.sourceTickAt(_currentPerformanceTick!);
 
   bool addFrame(
     AudioFrame frame, {
@@ -100,7 +119,7 @@ class MelodyTestSession {
         voiceDetected: detectedVoice,
       ),
     );
-    return timelineStarted && currentCursorTick == _scoreEndTick;
+    return timelineStarted && _currentPerformanceTick == _scoreEndTick;
   }
 
   Future<MelodyTestResult> finishAsync() => compute(_finishSession, this);

@@ -133,6 +133,8 @@ class CompositionStorageService {
                 beatsPerMeasure:
                     (value as Map<String, dynamic>)['beatsPerMeasure'] as int,
                 beatUnit: value['beatUnit'] as int,
+                barlines: (value['barlines'] as List? ?? const [])
+                    .cast<String>(),
               ),
           ];
     final measures = const MeasureBuilder().build(
@@ -336,6 +338,10 @@ class CompositionStorageService {
       measureTemplates.add(
         Measure(
           index: index,
+          barlines: [
+            for (final bar in xmlMeasure.findElements('barline'))
+              bar.toXmlString(),
+          ],
           beatsPerMeasure: measureBeats,
           beatUnit: measureBeatUnit,
         ),
@@ -528,6 +534,7 @@ class CompositionStorageService {
             composition.beatsPerMeasure,
           ),
           'beatUnit': measure.effectiveBeatUnit(composition.beatUnit),
+          'barlines': measure.barlines,
         },
     ],
     'tempoBpm': composition.tempoBpm,
@@ -626,8 +633,20 @@ class CompositionStorageService {
           '      <direction placement="above"><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>${composition.tempoBpm}</per-minute></metronome></direction-type><sound tempo="${composition.tempoBpm}"/></direction>',
         );
       }
+      for (final bar in measure.barlines) {
+        if (XmlDocument.parse(bar).rootElement.getAttribute('location') ==
+            'left') {
+          buffer.writeln(bar);
+        }
+      }
       for (final note in measure.notes) {
         _writeMusicXmlNote(buffer, composition, note);
+      }
+      for (final bar in measure.barlines) {
+        if (XmlDocument.parse(bar).rootElement.getAttribute('location') !=
+            'left') {
+          buffer.writeln(bar);
+        }
       }
       buffer.writeln('    </measure>');
       previousBeats = measureBeats;

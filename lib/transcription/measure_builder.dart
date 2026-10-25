@@ -109,6 +109,9 @@ class MeasureBuilder {
       for (var index = 0; index < notesByMeasure.length; index++)
         Measure(
           index: index,
+          barlines: index < measureTemplates.length
+              ? measureTemplates[index].barlines
+              : const [],
           beatsPerMeasure: index < measureTemplates.length
               ? measureTemplates[index].beatsPerMeasure
               : null,

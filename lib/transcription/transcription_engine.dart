@@ -371,6 +371,7 @@ class TranscriptionEngine {
           Measure(
             index: index,
             notes: measure.notes,
+            barlines: measure.barlines,
             beatsPerMeasure: measure.beatsPerMeasure,
             beatUnit: measure.beatUnit,
           ),
@@ -395,6 +396,7 @@ class TranscriptionEngine {
         Measure(
           index: measure.index,
           notes: measure.notes,
+          barlines: measure.barlines,
           beatsPerMeasure: measure.index == measureIndex
               ? beatsPerMeasure.clamp(1, 32)
               : measure.beatsPerMeasure,
