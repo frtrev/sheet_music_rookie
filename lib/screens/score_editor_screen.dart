@@ -524,7 +524,10 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       await _stopTest(showResults: true);
       return;
     }
-    final session = MelodyTestSession(_engine.composition.value);
+    final session = MelodyTestSession(
+      _engine.composition.value,
+      voicePolish: _engine.settings.value.voicePolish,
+    );
     if (!session.hasNotes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -571,8 +574,12 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.setCaptureEnabled(true);
     _testSession = null;
     _pausedByUser = true;
-    final result = session?.finish();
-    _testStopping = false;
+    MelodyTestResult? result;
+    try {
+      result = await session?.finishAsync();
+    } finally {
+      _testStopping = false;
+    }
     if (showResults && result != null && mounted) {
       await _showTestResult(result);
     }
@@ -1511,7 +1518,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 leading: const Icon(Icons.graphic_eq),
                 title: const Text('Settings'),
                 subtitle: const Text(
-                  'Changes apply while the microphone is running',
+                  'Recognition, practice, and test playback',
                 ),
                 childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
                 children: [

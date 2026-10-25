@@ -42,6 +42,9 @@ class SettingsService {
       cursorFollowFraction:
           prefs.getDouble('${_prefix}cursorFollowFraction') ??
           defaults.cursorFollowFraction,
+      voicePolish:
+          (prefs.getDouble('${_prefix}voicePolish') ?? defaults.voicePolish)
+              .clamp(0.0, 1.0),
       smoothingWindow:
           prefs.getInt('${_prefix}smoothing') ?? defaults.smoothingWindow,
     );
@@ -68,6 +71,10 @@ class SettingsService {
         value.cursorFollowFraction,
       ),
       prefs.setInt('${_prefix}smoothing', value.smoothingWindow),
+      prefs.setDouble(
+        '${_prefix}voicePolish',
+        value.voicePolish.clamp(0.0, 1.0),
+      ),
     ]);
   }
 }

@@ -42,6 +42,33 @@ const composition = Composition(
 );
 
 void main() {
+  test('voice polish changes playback without changing any scores', () async {
+    final dry = MelodyTestSession(composition);
+    final polished = MelodyTestSession(composition, voicePolish: 1);
+    for (var time = 0; time < 1000; time += 20) {
+      for (final session in [dry, polished]) {
+        session.addFrame(
+          frame(time),
+          pitch: pitch(time, time < 500 ? 69 : 71),
+          voiceDetected: true,
+        );
+      }
+    }
+    final original = dry.finish();
+    final enhanced = await polished.finishAsync();
+    expect(enhanced.score, original.score);
+    expect(enhanced.pitchScore, original.pitchScore);
+    expect(enhanced.timingScore, original.timingScore);
+    expect(enhanced.matchupWave, isNot(equals(original.matchupWave)));
+    final pcm = ByteData.sublistView(enhanced.matchupWave!);
+    for (var i = 44; i < pcm.lengthInBytes; i += 2) {
+      expect(
+        pcm.getInt16(i, Endian.little).abs(),
+        lessThanOrEqualTo((32767 * .97).ceil()),
+      );
+    }
+  });
+
   test(
     'an in-tune and in-time melody receives a high score and matchup WAV',
     () {
@@ -102,26 +129,25 @@ void main() {
     );
   });
 
-  test('note-led test waits for any detected pitch before moving the cursor', () {
-    final session = MelodyTestSession(composition);
+  test(
+    'note-led test waits for any detected pitch before moving the cursor',
+    () {
+      final session = MelodyTestSession(composition);
 
-    session.addFrame(frame(100), pitch: null, voiceDetected: false);
-    expect(session.timelineStarted, isFalse);
-    expect(session.currentCursorTick, isNull);
-    expect(session.currentExpectedMidiPitch, 69);
+      session.addFrame(frame(100), pitch: null, voiceDetected: false);
+      expect(session.timelineStarted, isFalse);
+      expect(session.currentCursorTick, isNull);
+      expect(session.currentExpectedMidiPitch, 69);
 
-    session.addFrame(
-      frame(200),
-      pitch: pitch(200, 60),
-      voiceDetected: true,
-    );
-    expect(session.timelineStarted, isTrue);
-    expect(session.currentCursorTick, 0);
+      session.addFrame(frame(200), pitch: pitch(200, 60), voiceDetected: true);
+      expect(session.timelineStarted, isTrue);
+      expect(session.currentCursorTick, 0);
 
-    session.addFrame(frame(700), pitch: null, voiceDetected: false);
-    expect(session.currentCursorTick, 480);
-    expect(session.currentExpectedMidiPitch, 71);
-  });
+      session.addFrame(frame(700), pitch: null, voiceDetected: false);
+      expect(session.currentCursorTick, 480);
+      expect(session.currentExpectedMidiPitch, 71);
+    },
+  );
 
   test('a leading rest starts the test timeline immediately', () {
     const withLeadingRest = Composition(

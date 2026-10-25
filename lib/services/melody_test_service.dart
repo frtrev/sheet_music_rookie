@@ -1,7 +1,9 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 
 import '../audio/microphone_service.dart';
+import '../audio/voice_polish.dart';
 import '../models/composition.dart';
 import '../models/pitch_detection_result.dart';
 import 'score_playback_service.dart';
@@ -21,18 +23,20 @@ class MelodyTestResult {
 }
 
 /// Captures one sung attempt, compares it with the score, and creates a WAV
-/// that overlays the original voice with the same piano reference used by
+/// that overlays the optionally polished voice with the same piano reference used by
 /// normal score playback.
 class MelodyTestSession {
   MelodyTestSession(
     this.composition, {
     this.outputSampleRate = 24000,
+    this.voicePolish = 0,
   }) : _expected = _expectedSpans(composition),
        _startsWithRest = _scoreStartsWithRest(composition),
        _scoreEndTick = _scoreDurationTicks(composition);
 
   final Composition composition;
   final int outputSampleRate;
+  final double voicePolish;
   final List<_ExpectedSpan> _expected;
   final bool _startsWithRest;
   final int _scoreEndTick;
@@ -53,9 +57,8 @@ class MelodyTestSession {
     return expectedMidiPitchAtTick(cursorTick ?? 0);
   }
 
-  int? expectedMidiPitchAtTick(int cursorTick) => _pitchAt(
-    (cursorTick * 60000 / (composition.tempoBpm * 480)).round(),
-  );
+  int? expectedMidiPitchAtTick(int cursorTick) =>
+      _pitchAt((cursorTick * 60000 / (composition.tempoBpm * 480)).round());
 
   int cursorTickAt(Duration elapsed) =>
       (elapsed.inMicroseconds * composition.tempoBpm * 480 / 60000000)
@@ -99,6 +102,8 @@ class MelodyTestSession {
     );
     return timelineStarted && currentCursorTick == _scoreEndTick;
   }
+
+  Future<MelodyTestResult> finishAsync() => compute(_finishSession, this);
 
   MelodyTestResult finish() {
     if (_attemptStartMs == null ||
@@ -212,19 +217,9 @@ class MelodyTestSession {
       (_audioSamples.length * 1000 / MicrophoneService.sampleRate).round(),
       _lastVoiceMs! + 300,
     );
-    const insertMs = 0;
     final voiceDurationMs = math.max(0, sourceEndMs - sourceStartMs);
-    final outputLength = math.max(
-      referenceSamples.length,
-      ((insertMs + voiceDurationMs) * outputSampleRate / 1000).ceil(),
-    );
-    final mixed = Float64List(outputLength);
-    for (var index = 0; index < referenceSamples.length; index++) {
-      mixed[index] = referenceSamples[index] * .72;
-    }
-
-    final insertSample = (insertMs * outputSampleRate / 1000).round();
     final voiceSamples = (voiceDurationMs * outputSampleRate / 1000).round();
+    final capturedVoice = Float64List(voiceSamples);
     for (var index = 0; index < voiceSamples; index++) {
       final sourcePosition =
           (sourceStartMs / 1000 + index / outputSampleRate) *
@@ -236,7 +231,33 @@ class MelodyTestSession {
       final voice =
           _audioSamples[lower] * (1 - fraction) +
           _audioSamples[upper] * fraction;
-      mixed[insertSample + index] += voice * 1.15;
+      capturedVoice[index] = voice;
+    }
+    final polished = const VoicePolish().process(
+      capturedVoice,
+      sampleRate: outputSampleRate,
+      amount: voicePolish,
+    );
+    final mixed = Float64List(
+      math.max(referenceSamples.length, polished.length),
+    );
+    for (var i = 0; i < referenceSamples.length; i++) {
+      mixed[i] = referenceSamples[i] * .72;
+    }
+    for (var i = 0; i < polished.length; i++) {
+      mixed[i] += polished[i] * 1.15;
+    }
+    // Keep the final voice + piano mix below clipping when polish is enabled.
+    if (voicePolish > 0) {
+      var peak = 0.0;
+      for (final sample in mixed) {
+        peak = math.max(peak, sample.abs());
+      }
+      if (peak > .97) {
+        for (var i = 0; i < mixed.length; i++) {
+          mixed[i] *= .97 / peak;
+        }
+      }
     }
     return _encodeWave(mixed, outputSampleRate);
   }
@@ -360,3 +381,5 @@ Uint8List _encodeWave(Float64List samples, int sampleRate) {
   }
   return result;
 }
+
+MelodyTestResult _finishSession(MelodyTestSession session) => session.finish();

@@ -65,8 +65,26 @@ class VoiceSettingsPanel extends StatelessWidget {
           max: .60,
           divisions: 7,
           formatter: (v) => '${(v * 100).round()}% from left',
-          onChanged: (v) =>
-              onChanged(value.copyWith(cursorFollowFraction: v)),
+          onChanged: (v) => onChanged(value.copyWith(cursorFollowFraction: v)),
+        ),
+        _SettingSlider(
+          label: 'Voice polish (test playback)',
+          value: value.voicePolish,
+          min: 0,
+          max: 1,
+          divisions: 20,
+          formatter: (v) => v == 0 ? 'Off' : '${(v * 100).round()}%',
+          onChanged: (v) => onChanged(value.copyWith(voicePolish: v)),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              'A clearer, smoother voice with subtle room ambience. Applies to your next test playback; pitch and scoring stay unchanged.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
         ),
         _SettingSlider(
           label: 'Minimum frequency',

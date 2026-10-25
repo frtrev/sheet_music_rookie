@@ -31,12 +31,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               Text(
-                'Recognition tuning',
+                'Sound & practice',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 6),
               const Text(
-                'These offline audio-analysis values are used for every new composition.',
+                'Personalize voice polish, practice, and recognition. Everything runs offline.',
               ),
               const SizedBox(height: 20),
               VoiceSettingsPanel(

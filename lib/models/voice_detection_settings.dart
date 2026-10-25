@@ -22,6 +22,7 @@ class VoiceDetectionSettings {
     this.practiceDifficulty = PracticeDifficulty.beginner,
     this.cursorFollowFraction = .40,
     this.smoothingWindow = 3,
+    this.voicePolish = .35,
   });
 
   final double minimumFrequency;
@@ -36,6 +37,7 @@ class VoiceDetectionSettings {
   final PracticeDifficulty practiceDifficulty;
   final double cursorFollowFraction;
   final int smoothingWindow;
+  final double voicePolish;
 
   VoiceDetectionSettings copyWith({
     double? minimumFrequency,
@@ -50,6 +52,7 @@ class VoiceDetectionSettings {
     PracticeDifficulty? practiceDifficulty,
     double? cursorFollowFraction,
     int? smoothingWindow,
+    double? voicePolish,
   }) {
     return VoiceDetectionSettings(
       minimumFrequency: minimumFrequency ?? this.minimumFrequency,
@@ -63,9 +66,9 @@ class VoiceDetectionSettings {
       articulationGapMs: articulationGapMs ?? this.articulationGapMs,
       pitchToleranceCents: pitchToleranceCents ?? this.pitchToleranceCents,
       practiceDifficulty: practiceDifficulty ?? this.practiceDifficulty,
-      cursorFollowFraction:
-          cursorFollowFraction ?? this.cursorFollowFraction,
+      cursorFollowFraction: cursorFollowFraction ?? this.cursorFollowFraction,
       smoothingWindow: smoothingWindow ?? this.smoothingWindow,
+      voicePolish: voicePolish ?? this.voicePolish,
     );
   }
 }
