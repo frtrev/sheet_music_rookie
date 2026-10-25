@@ -69,6 +69,7 @@ class MeasureBuilder {
               startTick: cursor,
               durationTicks: duration,
               sourceEventIndex: sourceEventIndex,
+              lyrics: firstPart ? event.lyrics : const [],
               accidental: event.isRest
                   ? NoteAccidental.none
                   : firstPart

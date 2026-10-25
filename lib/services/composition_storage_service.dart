@@ -1,3 +1,5 @@
+import '../models/note_lyric.dart';
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -406,6 +408,10 @@ class CompositionStorageService {
           .any((tie) => tie.getAttribute('type') == 'start');
       rawEvents.add(
         RawNoteEvent(
+          lyrics: [
+            for (final lyric in note.findElements('lyric'))
+              NoteLyric(lyric.toXmlString()),
+          ],
           startTimeMs: timestampMs,
           endTimeMs: timestampMs + durationMs,
           frequencyHz: frequency,
@@ -541,9 +547,14 @@ class CompositionStorageService {
     'accidental': event.accidental.name,
     'isRest': event.isRest,
     'tieToNext': event.tieToNext,
+    'lyrics': [for (final lyric in event.lyrics) lyric.xml],
   };
 
   RawNoteEvent _rawEventFromJson(Map<String, dynamic> data) => RawNoteEvent(
+    lyrics: [
+      for (final xml in (data['lyrics'] as List? ?? const []))
+        NoteLyric(xml as String),
+    ],
     startTimeMs: data['startTimeMs'] as int,
     endTimeMs: data['endTimeMs'] as int,
     frequencyHz: (data['frequencyHz'] as num).toDouble(),
@@ -673,6 +684,9 @@ class CompositionStorageService {
         buffer.writeln('          <tied type="start"/>');
       }
       buffer.writeln('        </notations>');
+    }
+    for (final lyric in note.lyrics) {
+      buffer.writeln(lyric.xml);
     }
     buffer.writeln('      </note>');
   }

@@ -1,3 +1,5 @@
+import 'note_lyric.dart';
+
 enum NoteAccidental { automatic, none, sharp, flat, natural }
 
 enum NoteValue {
@@ -29,6 +31,7 @@ class MusicalNote {
     this.isRest = false,
     this.tieFromPrevious = false,
     this.tieToNext = false,
+    this.lyrics = const [],
   });
 
   final int midiPitch;
@@ -40,9 +43,11 @@ class MusicalNote {
   final bool isRest;
   final bool tieFromPrevious;
   final bool tieToNext;
+  final List<NoteLyric> lyrics;
 
   MusicalNote copyWith({NoteAccidental? accidental, bool? flatSpelling}) =>
       MusicalNote(
+        lyrics: lyrics,
         midiPitch: midiPitch,
         startTick: startTick,
         durationTicks: durationTicks,

@@ -5,13 +5,118 @@ import 'package:flutter/material.dart';
 
 import '../models/composition.dart';
 import '../models/musical_note.dart';
+import '../models/note_lyric.dart';
 import 'rest_symbol.dart';
+
+class _LayoutCache {
+  final widths = <int, double>{};
+  final offsets = <double>[ScoreLayout.left];
+  List<String>? lines;
+  double? lyricsTop;
+  double? height;
+  List<({int tick, double x})>? cursorAnchors;
+}
+
+final _lyricText = Expando<TextPainter>();
+TextPainter _lyricPainter(NoteLyric lyric) =>
+    _lyricText[lyric] ??= (TextPainter(
+      text: TextSpan(
+        text: lyric.text,
+        style: const TextStyle(fontSize: 14, color: Color(0xff10254f)),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout());
 
 class ScoreLayout {
   static const measureWidth = 250.0;
   static const lineGap = 14.0;
   static const staffTop = 96.0;
   static const left = 72.0;
+
+  static final _layouts = Expando<_LayoutCache>();
+  static _LayoutCache _cache(Composition composition) =>
+      _layouts[composition] ??= _LayoutCache();
+
+  static double widthFor(Composition composition, int index) =>
+      _cache(composition).widths
+          .putIfAbsent(index, () => _computeWidth(composition, index));
+
+  static double _computeWidth(Composition composition, int index) {
+    if (index >= composition.measures.length) return measureWidth;
+    final measure = composition.measures[index];
+    var longest = 0.0;
+    var gap = composition.measureCapacityTicks(index);
+    for (final (i, note) in measure.notes.indexed) {
+      if (note.lyrics.isEmpty) continue;
+      for (final lyric in note.lyrics) {
+        final painter = _lyricPainter(lyric);
+        longest = math.max(longest, painter.width);
+      }
+      final next = i + 1 < measure.notes.length
+          ? measure.notes[i + 1].startTick
+          : composition.measureCapacityTicks(index);
+      gap = math.min(gap, math.max(1, next - note.startTick));
+    }
+    if (longest == 0) return measureWidth;
+    return math.max(
+      measureWidth,
+      contentStart(composition, index) +
+          30 +
+          (longest + 14) * composition.measureCapacityTicks(index) / gap,
+    );
+  }
+
+  static double measureLeft(Composition composition, int index) {
+    final offsets = _cache(composition).offsets;
+    while (offsets.length <= index) {
+      offsets.add(offsets.last + widthFor(composition, offsets.length - 1));
+    }
+    return offsets[index];
+  }
+
+  static List<String> lyricLines(Composition composition) =>
+      _cache(composition).lines ??= _computeLyricLines(composition);
+
+  static List<String> _computeLyricLines(Composition composition) {
+    final lines = composition.measures
+        .expand((m) => m.notes)
+        .expand((n) => n.lyrics)
+        .map((l) => l.number)
+        .toSet()
+        .toList();
+    lines.sort((a, b) {
+      final x = int.tryParse(a);
+      final y = int.tryParse(b);
+      return x != null && y != null ? x.compareTo(y) : a.compareTo(b);
+    });
+    return lines;
+  }
+
+  static double lyricsTop(Composition composition) =>
+      _cache(composition).lyricsTop ??= _computeLyricsTop(composition);
+
+  static double _computeLyricsTop(Composition composition) {
+    var top = 202.0;
+    for (final measure in composition.measures) {
+      for (final note in measure.notes.where((n) => !n.isRest)) {
+        top = math.max(
+          top,
+          noteCenter(composition, measure.index, note).dy + 48,
+        );
+      }
+    }
+    return top;
+  }
+
+  static double height(Composition composition) =>
+      _cache(composition).height ??= _computeHeight(composition);
+
+  static double _computeHeight(Composition composition) {
+    final lines = lyricLines(composition);
+    return lines.isEmpty
+        ? 250
+        : math.max(250, lyricsTop(composition) + lines.length * 26 + 24);
+  }
 
   static double contentStart(Composition composition, int measureIndex) {
     if (measureIndex == 0) {
@@ -24,7 +129,8 @@ class ScoreLayout {
             previous.effectiveBeats(composition.beatsPerMeasure) ||
         measure.effectiveBeatUnit(composition.beatUnit) !=
             previous.effectiveBeatUnit(composition.beatUnit);
-    return changed ? 44 : 14;
+    final hasLyrics = measure.notes.any((n) => n.lyrics.isNotEmpty);
+    return changed ? (hasLyrics ? 54 : 44) : (hasLyrics ? 40 : 14);
   }
 
   static Offset noteCenter(
@@ -33,10 +139,9 @@ class ScoreLayout {
     MusicalNote note,
   ) {
     final start = contentStart(composition, measureIndex);
-    final usable = measureWidth - start - 14;
+    final usable = widthFor(composition, measureIndex) - start - 14;
     final x =
-        left +
-        measureIndex * measureWidth +
+        measureLeft(composition, measureIndex) +
         start +
         usable *
             note.startTick /
@@ -99,14 +204,18 @@ class ScoreLayout {
       composition.editableEndTick;
 
   static int tickAtX(Composition composition, double x) {
-    final rawMeasureIndex = ((x - left) / measureWidth).floor();
+    var rawMeasureIndex = 0;
+    while (rawMeasureIndex + 1 < composition.measures.length &&
+        x >= measureLeft(composition, rawMeasureIndex + 1)) {
+      rawMeasureIndex++;
+    }
     final measureIndex = rawMeasureIndex
         .clamp(0, math.max(0, composition.measures.length - 1))
         .toInt();
     final capacity = composition.measureCapacityTicks(measureIndex);
     final start = contentStart(composition, measureIndex);
-    final usable = measureWidth - start - 14;
-    final localX = x - left - measureIndex * measureWidth - start;
+    final usable = widthFor(composition, measureIndex) - start - 14;
+    final localX = x - measureLeft(composition, measureIndex) - start;
     final unsnappedTick = (localX / usable * capacity).round();
     final localTick = ((unsnappedTick / 120).round() * 120)
         .clamp(0, capacity)
@@ -128,11 +237,56 @@ class ScoreLayout {
     final localTick = (boundedTick - composition.measureStartTick(measureIndex))
         .clamp(0, capacity);
     final start = contentStart(composition, measureIndex);
-    final usable = measureWidth - start - 14;
-    return left +
-        measureIndex * measureWidth +
+    final usable = widthFor(composition, measureIndex) - start - 14;
+    return measureLeft(composition, measureIndex) +
         start +
         usable * localTick / capacity;
+  }
+
+  /// Playback traverses the space between note onsets, including the padding
+  /// around barlines. The editing cursor keeps its original tick hit-testing.
+  static double playbackCursorX(Composition composition, int absoluteTick) {
+    if (lyricLines(composition).isEmpty) {
+      return cursorX(composition, absoluteTick);
+    }
+    final anchors = _cache(composition).cursorAnchors ??= _cursorAnchors(
+      composition,
+    );
+    if (anchors.length < 2) return cursorX(composition, absoluteTick);
+    if (absoluteTick <= anchors.first.tick) return anchors.first.x;
+    if (absoluteTick >= anchors.last.tick) return anchors.last.x;
+    var low = 0;
+    var high = anchors.length - 1;
+    while (high - low > 1) {
+      final middle = (low + high) ~/ 2;
+      if (anchors[middle].tick <= absoluteTick) {
+        low = middle;
+      } else {
+        high = middle;
+      }
+    }
+    final start = anchors[low];
+    final end = anchors[high];
+    final fraction = (absoluteTick - start.tick) / (end.tick - start.tick);
+    return start.x + (end.x - start.x) * fraction;
+  }
+
+  static List<({int tick, double x})> _cursorAnchors(Composition composition) {
+    final positions = <int, double>{};
+    for (final measure in composition.measures) {
+      final start = composition.measureStartTick(measure.index);
+      for (final note in measure.notes) {
+        positions[start + note.startTick] = noteCenter(
+          composition,
+          measure.index,
+          note,
+        ).dx;
+      }
+    }
+    final end = scoreEndTick(composition);
+    positions.putIfAbsent(end, () => cursorX(composition, end));
+    final ticks = positions.keys.toList()..sort();
+    return [for (final tick in ticks) (tick: tick, x: positions[tick]!)];
   }
 
   static double? scrollOffsetToRevealCursor({
@@ -199,45 +353,62 @@ class ScoreView extends StatelessWidget {
   Widget build(BuildContext context) {
     final displayedMeasures = math.max(3, composition.measures.length);
     final width =
-        ScoreLayout.left +
-        displayedMeasures * ScoreLayout.measureWidth +
+        ScoreLayout.measureLeft(composition, displayedMeasures) +
         MediaQuery.sizeOf(context).width * (1 - cursorFollowFraction);
-    return Scrollbar(
-      controller: scrollController,
-      thumbVisibility: true,
-      child: SingleChildScrollView(
-        controller: scrollController,
-        scrollDirection: Axis.horizontal,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapUp: onCursorMoved == null
-              ? null
-              : (details) => _handleTap(details.localPosition),
-          child: SizedBox(
-            width: width,
-            height: 250,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                CustomPaint(
-                  painter: ScorePainter(
-                    composition,
-                    selectedEventIndex: selectedEventIndex,
-                    playbackPosition: playbackPosition,
-                    showPlaybackCursor: showPlaybackCursor,
-                  ),
-                ),
-                if (practiceTargetTick != null && practiceProgress != null)
-                  IgnorePointer(
-                    child: CustomPaint(
-                      painter: PracticeProgressPainter(
-                        composition,
-                        targetTick: practiceTargetTick!,
-                        progress: practiceProgress!,
+    return SingleChildScrollView(
+      child: SizedBox(
+        height: ScoreLayout.height(composition),
+        child: Scrollbar(
+          controller: scrollController,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: scrollController,
+            scrollDirection: Axis.horizontal,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapUp: onCursorMoved == null
+                  ? null
+                  : (details) => _handleTap(details.localPosition),
+              child: SizedBox(
+                width: width,
+                height: ScoreLayout.height(composition),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    RepaintBoundary(
+                      child: CustomPaint(
+                        isComplex: true,
+                        painter: ScorePainter(
+                          composition,
+                          selectedEventIndex: selectedEventIndex,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                    if (showPlaybackCursor)
+                      IgnorePointer(
+                        child: RepaintBoundary(
+                          child: CustomPaint(
+                            willChange: true,
+                            painter: ScoreCursorPainter(
+                              composition,
+                              playbackPosition,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (practiceTargetTick != null && practiceProgress != null)
+                      IgnorePointer(
+                        child: CustomPaint(
+                          painter: PracticeProgressPainter(
+                            composition,
+                            targetTick: practiceTargetTick!,
+                            progress: practiceProgress!,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -249,6 +420,26 @@ class ScoreView extends StatelessWidget {
     final ticks = ScoreLayout.tickAtX(composition, position.dx);
     onCursorMoved?.call(ScoreLayout.durationAt(ticks, composition.tempoBpm));
   }
+}
+
+/// The moving cursor repaints independently of the staff and lyric layer.
+class ScoreCursorPainter extends CustomPainter {
+  ScoreCursorPainter(this.composition, this.position);
+  final Composition composition;
+  final Duration position;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    ScorePainter(
+      composition,
+      playbackPosition: position,
+    )._drawPlaybackCursor(canvas);
+  }
+
+  @override
+  bool shouldRepaint(covariant ScoreCursorPainter oldDelegate) =>
+      oldDelegate.composition != composition ||
+      oldDelegate.position != position;
 }
 
 class PracticeProgressPainter extends CustomPainter {
@@ -338,8 +529,7 @@ class ScorePainter extends CustomPainter {
       ..strokeWidth = 1.25
       ..style = PaintingStyle.stroke;
     final displayedMeasures = math.max(3, composition.measures.length);
-    final staffEnd =
-        ScoreLayout.left + displayedMeasures * ScoreLayout.measureWidth;
+    final staffEnd = ScoreLayout.measureLeft(composition, displayedMeasures);
 
     for (var line = 0; line < 5; line++) {
       final y = ScoreLayout.staffTop + line * ScoreLayout.lineGap;
@@ -351,7 +541,7 @@ class ScorePainter extends CustomPainter {
       ink..strokeWidth = 2,
     );
     for (var measure = 0; measure <= displayedMeasures; measure++) {
-      final x = ScoreLayout.left + measure * ScoreLayout.measureWidth;
+      final x = ScoreLayout.measureLeft(composition, measure);
       canvas.drawLine(
         Offset(x, ScoreLayout.staffTop),
         Offset(x, ScoreLayout.staffTop + 4 * ScoreLayout.lineGap),
@@ -413,10 +603,7 @@ class ScorePainter extends CustomPainter {
           _drawText(
             canvas,
             '$beats\n$unit',
-            Offset(
-              ScoreLayout.left + measure.index * ScoreLayout.measureWidth + 7,
-              93,
-            ),
+            Offset(ScoreLayout.measureLeft(composition, measure.index) + 7, 93),
             19,
             height: .72,
           );
@@ -428,15 +615,74 @@ class ScorePainter extends CustomPainter {
       _drawText(
         canvas,
         '${measure.index + 1}',
-        Offset(
-          ScoreLayout.left + measure.index * ScoreLayout.measureWidth + 6,
-          174,
-        ),
+        Offset(ScoreLayout.measureLeft(composition, measure.index) + 6, 174),
         11,
         color: const Color(0xff777a74),
       );
     }
+    _drawLyrics(canvas);
     if (showPlaybackCursor) _drawPlaybackCursor(canvas);
+  }
+
+  void _drawLyrics(Canvas canvas) {
+    final lines = ScoreLayout.lyricLines(composition);
+    final top = ScoreLayout.lyricsTop(composition);
+    for (final (row, line) in lines.indexed) {
+      _drawText(
+        canvas,
+        line,
+        Offset(28, top + row * 26),
+        12,
+        color: const Color(0xff566784),
+      );
+    }
+    for (final measure in composition.measures) {
+      for (final (index, note) in measure.notes.indexed) {
+        final center = ScoreLayout.noteCenter(composition, measure.index, note);
+        final nextX = index + 1 < measure.notes.length
+            ? ScoreLayout.noteCenter(
+                composition,
+                measure.index,
+                measure.notes[index + 1],
+              ).dx
+            : ScoreLayout.measureLeft(composition, measure.index + 1);
+        final previousX = index > 0
+            ? ScoreLayout.noteCenter(
+                composition,
+                measure.index,
+                measure.notes[index - 1],
+              ).dx
+            : ScoreLayout.measureLeft(composition, measure.index);
+        final available = math.max(
+          8.0,
+          math.min(nextX - center.dx, center.dx - previousX) - 4,
+        );
+        for (final lyric in note.lyrics) {
+          final y = top + lines.indexOf(lyric.number) * 26;
+          final text = _lyricPainter(lyric);
+          final scale = text.width > available ? available / text.width : 1.0;
+          canvas.save();
+          canvas.translate(center.dx - text.width * scale / 2, y);
+          canvas.scale(scale, 1);
+          text.paint(canvas, Offset.zero);
+          canvas.restore();
+          final end = center.dx + text.width * scale / 2 + 3;
+          if ((lyric.syllabic == 'begin' || lyric.syllabic == 'middle') &&
+              nextX - end > 8) {
+            _drawText(canvas, '−', Offset((end + nextX - 5) / 2 - 4, y), 12);
+          }
+          if (lyric.extendsNote && nextX - end > 5) {
+            canvas.drawLine(
+              Offset(end, y + 17),
+              Offset(nextX - 5, y + 17),
+              Paint()
+                ..color = const Color(0xff566784)
+                ..strokeWidth = 1,
+            );
+          }
+        }
+      }
+    }
   }
 
   Set<int> _selectedSourceEvents() {
@@ -631,7 +877,7 @@ class ScorePainter extends CustomPainter {
 
   void _drawPlaybackCursor(Canvas canvas) {
     final ticks = ScoreLayout.ticksAt(playbackPosition, composition.tempoBpm);
-    final x = ScoreLayout.cursorX(composition, ticks);
+    final x = ScoreLayout.playbackCursorX(composition, ticks);
     final paint = Paint()
       ..color = const Color(0xffd25b3f)
       ..strokeWidth = 2.5

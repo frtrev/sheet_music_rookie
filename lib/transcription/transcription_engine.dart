@@ -489,6 +489,7 @@ class TranscriptionEngine {
                 .clamp(0, 127)
                 .toInt();
         rawEvents[eventIndex] = RawNoteEvent(
+          lyrics: original.lyrics,
           startTimeMs: original.startTimeMs,
           endTimeMs: original.endTimeMs,
           frequencyHz: (440 * math.pow(2, (soundingMidi - 69) / 12)).toDouble(),
@@ -609,6 +610,7 @@ class TranscriptionEngine {
           ? nextValue.ticks
           : _ticksFor(event);
       rawEvents[index] = RawNoteEvent(
+        lyrics: event.lyrics,
         startTimeMs: event.startTimeMs,
         endTimeMs: event.startTimeMs + _millisecondsForTicks(editedTicks),
         frequencyHz: frequency.toDouble(),
@@ -727,6 +729,7 @@ class TranscriptionEngine {
     return RawNoteEvent(
       startTimeMs: startMs,
       endTimeMs: startMs + durationMs,
+      lyrics: source.lyrics,
       frequencyHz: source.frequencyHz,
       midiPitch: source.midiPitch,
       confidence: source.confidence,

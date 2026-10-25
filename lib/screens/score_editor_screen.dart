@@ -183,7 +183,30 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
 
   void _notationCursorChanged() {
     if (_shouldFollowCursor && !_manualCursorMoveInProgress) {
-      _scheduleCursorScroll();
+      // Cursor and viewport must move before the same frame is drawn. Waiting
+      // until post-frame briefly displays the new cursor at the old offset.
+      _followCursor();
+    }
+  }
+
+  void _followCursor() {
+    if (!mounted || !_scoreScroll.hasClients || !_shouldFollowCursor) return;
+    final position = _scoreScroll.position;
+    if (!position.hasContentDimensions) return;
+    final composition = _engine.composition.value;
+    final cursorX = ScoreLayout.playbackCursorX(
+      composition,
+      _engine.notationCursorTick.value,
+    );
+    final target = ScoreLayout.scrollOffsetToFollowCursor(
+      cursorX: cursorX,
+      currentOffset: position.pixels,
+      viewportWidth: position.viewportDimension,
+      maxScrollExtent: position.maxScrollExtent,
+      followFraction: _engine.settings.value.cursorFollowFraction,
+    );
+    if (target != null && (target - position.pixels).abs() > .01) {
+      _scoreScroll.jumpTo(target);
     }
   }
 
@@ -206,23 +229,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (requestId != _cursorScrollRequestId) return;
       _cursorScrollScheduled = false;
-      if (!mounted || !_scoreScroll.hasClients || !_shouldFollowCursor) return;
-      final composition = _engine.composition.value;
-      final cursorX = ScoreLayout.cursorX(
-        composition,
-        _engine.notationCursorTick.value,
-      );
-      final position = _scoreScroll.position;
-      final target = ScoreLayout.scrollOffsetToFollowCursor(
-        cursorX: cursorX,
-        currentOffset: position.pixels,
-        viewportWidth: position.viewportDimension,
-        maxScrollExtent: position.maxScrollExtent,
-        followFraction: _engine.settings.value.cursorFollowFraction,
-      );
-      if (target != null) {
-        _scoreScroll.jumpTo(target);
-      }
+      _followCursor();
     });
   }
 
@@ -1340,7 +1347,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
             Card(
               clipBehavior: Clip.antiAlias,
               child: SizedBox(
-                height: 250,
+                height: 350,
                 child: ValueListenableBuilder<Composition>(
                   valueListenable: _engine.composition,
                   builder: (context, composition, _) =>
@@ -1390,9 +1397,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                                       .settings
                                       .value
                                       .cursorFollowFraction,
-                                  onCursorMoved: (position) => unawaited(
-                                    _movePlaybackCursor(position),
-                                  ),
+                                  onCursorMoved: (position) =>
+                                      unawaited(_movePlaybackCursor(position)),
                                 ),
                               ),
                             ],

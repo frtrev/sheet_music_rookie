@@ -1,3 +1,4 @@
+import 'note_lyric.dart';
 import 'musical_note.dart';
 
 class RawNoteEvent {
@@ -10,6 +11,7 @@ class RawNoteEvent {
     this.accidental = NoteAccidental.automatic,
     this.isRest = false,
     this.tieToNext = false,
+    this.lyrics = const [],
   });
 
   final int startTimeMs;
@@ -20,6 +22,7 @@ class RawNoteEvent {
   final NoteAccidental accidental;
   final bool isRest;
   final bool tieToNext;
+  final List<NoteLyric> lyrics;
 
   int get durationMs => endTimeMs - startTimeMs;
 
@@ -33,6 +36,7 @@ class RawNoteEvent {
     bool? tieToNext,
   }) {
     return RawNoteEvent(
+      lyrics: lyrics,
       startTimeMs: startTimeMs,
       endTimeMs: endTimeMs ?? this.endTimeMs,
       frequencyHz: frequencyHz ?? this.frequencyHz,
