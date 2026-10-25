@@ -39,6 +39,9 @@ class SettingsService {
             value.name == prefs.getString('${_prefix}practiceDifficulty'),
         orElse: () => defaults.practiceDifficulty,
       ),
+      cursorFollowFraction:
+          prefs.getDouble('${_prefix}cursorFollowFraction') ??
+          defaults.cursorFollowFraction,
       smoothingWindow:
           prefs.getInt('${_prefix}smoothing') ?? defaults.smoothingWindow,
     );
@@ -59,6 +62,10 @@ class SettingsService {
       prefs.setString(
         '${_prefix}practiceDifficulty',
         value.practiceDifficulty.name,
+      ),
+      prefs.setDouble(
+        '${_prefix}cursorFollowFraction',
+        value.cursorFollowFraction,
       ),
       prefs.setInt('${_prefix}smoothing', value.smoothingWindow),
     ]);

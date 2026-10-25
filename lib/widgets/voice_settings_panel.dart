@@ -59,6 +59,16 @@ class VoiceSettingsPanel extends StatelessWidget {
           onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
         ),
         _SettingSlider(
+          label: 'Automatic cursor position',
+          value: value.cursorFollowFraction,
+          min: .25,
+          max: .60,
+          divisions: 7,
+          formatter: (v) => '${(v * 100).round()}% from left',
+          onChanged: (v) =>
+              onChanged(value.copyWith(cursorFollowFraction: v)),
+        ),
+        _SettingSlider(
           label: 'Minimum frequency',
           value: value.minimumFrequency,
           min: 50,

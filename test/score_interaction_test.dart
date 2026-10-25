@@ -149,6 +149,29 @@ void main() {
     expect(backward, 98);
   });
 
+  test('automatic cursor following holds the cursor left of center', () {
+    expect(
+      ScoreLayout.scrollOffsetToFollowCursor(
+        cursorX: 500,
+        currentOffset: 0,
+        viewportWidth: 320,
+        maxScrollExtent: 600,
+        followFraction: .4,
+      ),
+      372,
+    );
+    expect(
+      ScoreLayout.scrollOffsetToFollowCursor(
+        cursorX: 500,
+        currentOffset: 372,
+        viewportWidth: 320,
+        maxScrollExtent: 600,
+        followFraction: .4,
+      ),
+      isNull,
+    );
+  });
+
   test('flat and sharp spellings use the correct staff position', () {
     final cSharp = ScoreLayout.staffStep(
       ClefType.treble,

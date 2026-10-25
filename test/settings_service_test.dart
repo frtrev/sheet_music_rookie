@@ -13,12 +13,12 @@ void main() {
     await service.save(
       const VoiceDetectionSettings(
         practiceDifficulty: PracticeDifficulty.advanced,
+        cursorFollowFraction: .35,
       ),
     );
 
-    expect(
-      (await service.load()).practiceDifficulty,
-      PracticeDifficulty.advanced,
-    );
+    final loaded = await service.load();
+    expect(loaded.practiceDifficulty, PracticeDifficulty.advanced);
+    expect(loaded.cursorFollowFraction, .35);
   });
 }

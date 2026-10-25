@@ -155,6 +155,20 @@ class ScoreLayout {
     }
     return null;
   }
+
+  static double? scrollOffsetToFollowCursor({
+    required double cursorX,
+    required double currentOffset,
+    required double viewportWidth,
+    required double maxScrollExtent,
+    required double followFraction,
+    double leftMargin = 28,
+  }) {
+    final anchor = viewportWidth * followFraction.clamp(.1, .9);
+    final viewportX = cursorX - currentOffset;
+    if (viewportX <= anchor && viewportX >= leftMargin) return null;
+    return (cursorX - anchor).clamp(0.0, maxScrollExtent).toDouble();
+  }
 }
 
 class ScoreView extends StatelessWidget {
@@ -167,6 +181,7 @@ class ScoreView extends StatelessWidget {
     this.showPlaybackCursor = false,
     this.practiceTargetTick,
     this.practiceProgress,
+    this.cursorFollowFraction = .40,
     this.onCursorMoved,
   });
 
@@ -177,13 +192,16 @@ class ScoreView extends StatelessWidget {
   final bool showPlaybackCursor;
   final int? practiceTargetTick;
   final ValueListenable<double>? practiceProgress;
+  final double cursorFollowFraction;
   final ValueChanged<Duration>? onCursorMoved;
 
   @override
   Widget build(BuildContext context) {
     final displayedMeasures = math.max(3, composition.measures.length);
     final width =
-        ScoreLayout.left + displayedMeasures * ScoreLayout.measureWidth;
+        ScoreLayout.left +
+        displayedMeasures * ScoreLayout.measureWidth +
+        MediaQuery.sizeOf(context).width * (1 - cursorFollowFraction);
     return Scrollbar(
       controller: scrollController,
       thumbVisibility: true,

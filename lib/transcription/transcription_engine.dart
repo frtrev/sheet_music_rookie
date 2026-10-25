@@ -53,7 +53,7 @@ class TranscriptionEngine {
     MicrophoneStatus.paused,
   );
   final ValueNotifier<PitchDetectionResult?> livePitch = ValueNotifier(null);
-  final ValueNotifier<int> audioFrameTimestampMs = ValueNotifier(0);
+  final ValueNotifier<AudioFrame?> latestAudioFrame = ValueNotifier(null);
   final ValueNotifier<int> currentNoteDurationMs = ValueNotifier(0);
   final ValueNotifier<VoiceDetectionSettings> settings = ValueNotifier(
     const VoiceDetectionSettings(),
@@ -168,7 +168,7 @@ class TranscriptionEngine {
         // cursor so the next sung note behaves like recording a new sheet.
         beginPunchInAt(notationCursorTick.value);
       }
-      audioFrameTimestampMs.value = frame.timestampMs;
+      latestAudioFrame.value = frame;
     } finally {
       _processing = false;
     }
@@ -799,7 +799,7 @@ class TranscriptionEngine {
     await _microphone.dispose();
     microphoneStatus.dispose();
     livePitch.dispose();
-    audioFrameTimestampMs.dispose();
+    latestAudioFrame.dispose();
     currentNoteDurationMs.dispose();
     settings.dispose();
     notationCursorTick.dispose();

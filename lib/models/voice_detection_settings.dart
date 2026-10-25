@@ -20,6 +20,7 @@ class VoiceDetectionSettings {
     this.articulationGapMs = 35,
     this.pitchToleranceCents = 45,
     this.practiceDifficulty = PracticeDifficulty.beginner,
+    this.cursorFollowFraction = .40,
     this.smoothingWindow = 3,
   });
 
@@ -33,6 +34,7 @@ class VoiceDetectionSettings {
   final int articulationGapMs;
   final double pitchToleranceCents;
   final PracticeDifficulty practiceDifficulty;
+  final double cursorFollowFraction;
   final int smoothingWindow;
 
   VoiceDetectionSettings copyWith({
@@ -46,6 +48,7 @@ class VoiceDetectionSettings {
     int? articulationGapMs,
     double? pitchToleranceCents,
     PracticeDifficulty? practiceDifficulty,
+    double? cursorFollowFraction,
     int? smoothingWindow,
   }) {
     return VoiceDetectionSettings(
@@ -60,6 +63,8 @@ class VoiceDetectionSettings {
       articulationGapMs: articulationGapMs ?? this.articulationGapMs,
       pitchToleranceCents: pitchToleranceCents ?? this.pitchToleranceCents,
       practiceDifficulty: practiceDifficulty ?? this.practiceDifficulty,
+      cursorFollowFraction:
+          cursorFollowFraction ?? this.cursorFollowFraction,
       smoothingWindow: smoothingWindow ?? this.smoothingWindow,
     );
   }

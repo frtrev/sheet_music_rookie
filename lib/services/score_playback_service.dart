@@ -44,6 +44,16 @@ class ScorePlaybackService {
     return true;
   }
 
+  Future<bool> playWave(Uint8List bytes) async {
+    if (bytes.isEmpty) return false;
+    await _player.stop();
+    position.value = Duration.zero;
+    await _player.setReleaseMode(ReleaseMode.stop);
+    await _player.play(BytesSource(bytes, mimeType: 'audio/wav'));
+    isPlaying.value = true;
+    return true;
+  }
+
   Future<void> seek(Duration target) async {
     position.value = target;
     if (isPlaying.value) await _player.seek(target);
