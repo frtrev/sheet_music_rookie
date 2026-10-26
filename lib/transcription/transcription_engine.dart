@@ -40,7 +40,9 @@ class TranscriptionEngine {
        composition = ValueNotifier(
          initialComposition ??
              Composition(clef: clef, octaveRange: octaveRange),
-       );
+       ) {
+    _savedSnapshot = _snapshot();
+  }
 
   final MicrophoneService _microphone;
   final SettingsService _settingsService;
@@ -69,6 +71,42 @@ class TranscriptionEngine {
   );
   final ValueNotifier<int> notationCursorTick = ValueNotifier(0);
   final ValueNotifier<Composition> composition;
+
+  late _ScoreSnapshot _savedSnapshot;
+
+  _ScoreSnapshot _dirtySnapshot(_ScoreSnapshot snapshot) {
+    final score = snapshot.composition;
+    final measures = [...score.measures];
+    // Live transcription can add an empty trailing bar without changing music.
+    while (measures.length > 1 &&
+        measures.last.notes.isEmpty &&
+        measures.last.barlines.isEmpty &&
+        measures.last.effectiveBeats(score.beatsPerMeasure) ==
+            score.beatsPerMeasure &&
+        measures.last.effectiveBeatUnit(score.beatUnit) == score.beatUnit) {
+      measures.removeLast();
+    }
+    return _ScoreSnapshot(
+      score.copyWith(measures: measures),
+      snapshot.events,
+      snapshot.cursor,
+    );
+  }
+
+  bool get hasUnsavedChanges =>
+      _recordingBefore != null ||
+      !_sameContent(
+        _dirtySnapshot(_savedSnapshot),
+        _dirtySnapshot(_snapshot()),
+      );
+
+  void markSaved(Composition savedComposition, List<RawNoteEvent> savedEvents) {
+    _savedSnapshot = _ScoreSnapshot(
+      savedComposition,
+      savedEvents,
+      notationCursorTick.value,
+    );
+  }
 
   static const historyLimit = 100;
   final _undo = <_ScoreSnapshot>[];

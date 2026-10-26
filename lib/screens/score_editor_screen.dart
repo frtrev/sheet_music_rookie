@@ -59,6 +59,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   bool _manualCursorMoveInProgress = false;
   int _cursorScrollRequestId = 0;
   bool _saving = false;
+  bool _leaving = false;
+  late bool _importPending;
   bool _historyBusy = false;
   bool _practiceActive = false;
   bool _testActive = false;
@@ -79,6 +81,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       initialEvents: widget.initialEvents,
     );
     _savePath = widget.savePath;
+    _importPending =
+        widget.initialComposition != null && widget.savePath == null;
     _playback = ScorePlaybackService()..onComplete = _playbackCompleted;
     _notePreview = ScorePlaybackService();
     _metronome = MetronomeService();
@@ -272,12 +276,54 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _leave() async {
-    if (_testActive) await _stopTest(showResults: false);
-    if (_practiceActive) await _stopPractice();
-    await _notePreview.stop(resetPosition: true);
-    await _stopPlayback(resumeListening: false, resetCursor: true);
-    await _pauseRecording();
-    if (mounted) Navigator.pop(context);
+    if (_leaving || _saving) return;
+    _leaving = true;
+    try {
+      if (_testActive) await _stopTest(showResults: false);
+      if (_practiceActive) await _stopPractice();
+      _pausedByUser = true;
+      await _notePreview.stop(resetPosition: true);
+      await _stopPlayback(resumeListening: false);
+      await _pauseRecording();
+      if (!mounted) return;
+      if (_importPending || _engine.hasUnsavedChanges) {
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              _importPending ? 'Save imported score?' : 'Unsaved changes',
+            ),
+            content: Text(
+              _importPending
+                  ? 'This imported score has not been saved to your library. Save it before leaving?'
+                  : 'Your score has unsaved changes. Save them before leaving?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'stay'),
+                child: const Text('Keep editing'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, 'discard'),
+                child: const Text('Discard'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, 'save'),
+                child: const Text('Save & leave'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || choice == null || choice == 'stay') return;
+        if (choice == 'save') {
+          await _save();
+          if (!mounted || _importPending || _engine.hasUnsavedChanges) return;
+        }
+      }
+      if (mounted) Navigator.pop(context);
+    } finally {
+      _leaving = false;
+    }
   }
 
   Future<void> _clear() async {
@@ -368,12 +414,16 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         _pausedByUser = true;
         await _pauseRecording();
       }
+      final scoreToSave = _engine.composition.value;
+      final eventsToSave = List<RawNoteEvent>.of(_engine.rawEvents);
       final saved = await _storage.save(
-        composition: _engine.composition.value,
-        rawEvents: _engine.rawEvents,
+        composition: scoreToSave,
+        rawEvents: eventsToSave,
         existingPath: _savePath,
       );
       _savePath = saved.path;
+      _engine.markSaved(scoreToSave, eventsToSave);
+      _importPending = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

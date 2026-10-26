@@ -257,6 +257,63 @@ void main() {
     },
   );
 
+  test('unsaved state follows edits, saves, undo, and redo rather than history length', () {
+    final e = _engine();
+    addTearDown(e.dispose);
+    expect(e.hasUnsavedChanges, isFalse);
+    e.notationCursorTick.value = 120;
+    e.setVolumes(playbackVolume: .4, metronomeVolume: .2);
+    expect(e.hasUnsavedChanges, isFalse);
+    e.insertManualNote(0, 60, NoteValue.quarter);
+    expect(e.hasUnsavedChanges, isTrue);
+    final savedScore = e.composition.value;
+    final savedEvents = e.rawEvents.toList();
+    e.markSaved(savedScore, savedEvents);
+    expect(e.hasUnsavedChanges, isFalse);
+    e.editNoteAtTick(0, pitchDelta: 1);
+    expect(e.hasUnsavedChanges, isTrue);
+    e.undo();
+    expect(e.hasUnsavedChanges, isFalse);
+    e.redo();
+    expect(e.hasUnsavedChanges, isTrue);
+    e.undo();
+    e.undo();
+    expect(e.hasUnsavedChanges, isTrue);
+    e.redo();
+    expect(e.hasUnsavedChanges, isFalse);
+    e.markSaved(savedScore, savedEvents);
+    e.setTitle('New title');
+    expect(e.hasUnsavedChanges, isTrue);
+  });
+
+  test('edits made while a save is in progress are still unsaved', () {
+    final e = _engine();
+    addTearDown(e.dispose);
+    e.insertManualNote(0, 60, NoteValue.quarter);
+    final savingScore = e.composition.value;
+    final savingEvents = e.rawEvents.toList();
+    e.editNoteAtTick(0, pitchDelta: 1);
+    e.markSaved(savingScore, savingEvents);
+    expect(e.hasUnsavedChanges, isTrue);
+  });
+
+  test(
+    'recording becomes dirty and returning to an empty score clears it',
+    () async {
+      final mic = _Microphone();
+      final e = _engine(microphone: mic);
+      addTearDown(e.dispose);
+      await e.startListening();
+      expect(e.hasUnsavedChanges, isFalse);
+      mic.sing(0, 600);
+      expect(e.hasUnsavedChanges, isTrue);
+      await e.pauseListening();
+      expect(e.hasUnsavedChanges, isTrue);
+      e.undo();
+      expect(e.hasUnsavedChanges, isFalse);
+    },
+  );
+
   test('history keeps the latest 100 edits', () async {
     final e = _engine();
     addTearDown(e.dispose);
