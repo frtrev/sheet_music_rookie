@@ -42,6 +42,7 @@ const composition = Composition(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('voice polish changes playback without changing any scores', () async {
     final dry = MelodyTestSession(composition);
     final polished = MelodyTestSession(composition, voicePolish: 1);

@@ -123,7 +123,12 @@ void main() {
           .composition;
       const renderer = PianoWaveSynthesizer(sampleRate: 8000);
       final waves = [
-        for (final voice in PlaybackInstrument.values)
+        for (final voice in [
+          PlaybackInstrument.piano,
+          PlaybackInstrument.nylonGuitar,
+          PlaybackInstrument.flute,
+          PlaybackInstrument.organ,
+        ])
           renderer.render(score.copyWith(playbackInstrument: voice))!,
       ];
       for (var i = 1; i < waves.length; i++) {

@@ -1,12 +1,15 @@
-# Playback sound options
+# Offline sampled instrument playback
 
-The app currently generates WAV audio offline with four modeled instruments: piano, nylon guitar, flute, and organ. The instrument selection is stored with the score and exported as a General MIDI program. Playback, note previews, and melody-test reference audio use the selected voice. These are synthesis models, not recordings of real acoustic instruments.
+GeneralUser GS v2.0.3 by S. Christian Collins is bundled at `assets/soundfonts/GeneralUser-GS.sf2` (about 31 MB). Its complete license is included alongside the bank and shown under **Playback instrument → Sound library licenses**. Source: https://github.com/mrbumpy409/GeneralUser-GS
 
-The piano now uses independently decaying, band-limited partials instead of the previous static detuned harmonics. Listening on real devices is still required to judge the improvement.
+The picker exposes 37 bank-zero General MIDI programs across Keyboards, Strings, and Winds. This includes pianos, organs, guitar, bass, bowed and plucked strings, brass, reeds, and flutes. Drum kits, percussion, synth pads/leads, sound effects and novelty presets are not offered. The complete bank remains bundled so its sample data and preset programming are unchanged.
 
-## Sample-based upgrade candidates
+`dart_melty_soundfont` (MIT; a Dart port of MeltySynth) renders the sampled instruments to WAV in a background isolate. The existing audio player still handles speaker/headphone output, seeking and playback-position updates. The bank asset is loaded once per app process. Each render constructs its own synthesizer, so notes/controllers from previews cannot leak into subsequent playback.
 
-- **GeneralUser GS + FluidSynth:** a practical candidate for many instrument choices. GeneralUser GS's author describes 261 presets and 13 drum kits with a 30.7 MB RAM footprint. It relies on standards-compliant SoundFont modulation. FluidSynth implements SoundFont 2 rendering; integrating a mobile renderer, packaging the bank, and measuring render time/memory would be separate implementation work. Sources: https://github.com/mrbumpy409/GeneralUser-GS and https://www.fluidsynth.org/api/Introduction.html
-- **Salamander Grand Piano:** a sampled piano with 16 velocity layers, release noises, and resonance recordings under CC BY 3.0. The maintained SFZ mapping uses SFZ 2/ARIA extensions, so a compatible sampler or a carefully tested subset/conversion is needed. Source: https://github.com/sfzinstruments/SalamanderGrandPiano
+Play, note previews, and the test-result reference use this path. Selected instruments continue to round-trip through saved score metadata and MusicXML MIDI program numbers. Melody scoring and captured voice enhancement are unchanged. Legacy synchronous renderer calls without a supplied bank retain the modeled voices for headless/unit-test use; app playback explicitly requires the bundled bank.
 
-Recommendation for the next sound-engine iteration: prototype GeneralUser GS with a compatible offline renderer on iOS and Android, compare piano/guitar/flute samples against the modeled voices, and measure startup latency, peak memory, app size, and rendering time on long repeated scores. For a piano-only premium-quality sound, evaluate a compact sample set derived from Salamander separately. No external sound banks or native rendering dependencies have been bundled in this change.
+Rendering processes note-on/off events in performance order, retains ties, adds a 350 ms release/reverb tail, and stops metronome clicks at the musical end. Sampled synthesis avoids the old static modeled timbres, but hardware listening and profiling are still needed to assess sound balance and latency on phones.
+
+The renderer supports SoundFont envelopes, filters, LFOs and built-in reverb/chorus. It is not claimed to reproduce every GeneralUser GS modulator exactly as FluidSynth would. Upstream documentation notes that standards-compliant SoundFont modulation matters to this bank's sound: https://github.com/mrbumpy409/GeneralUser-GS/tree/main/documentation
+
+Validation covers all 37 selected presets against the actual bank, audible nonzero PCM output, rest alignment, release-tail timing, asset loading/caching, score metadata, repeats and unchanged test scoring. Set `GENERALUSER_EXAMPLE` to a local score to run the optional complete-score rendering check.

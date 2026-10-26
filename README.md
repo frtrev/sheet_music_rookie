@@ -1,6 +1,6 @@
 # Sheet Music Rookie
 
-An offline Flutter prototype that turns a single sung melody into editable-ready musical data and dynamically rendered notation. Phase 1 supports treble and bass clefs, selectable octave ranges, all 15 standard major key signatures, live YIN pitch detection, syllable-aware note segmentation, rhythm quantization (including dotted values), automatic 4/4 measures, tied bar-line splits, piano-style score playback, a tempo-synchronized metronome, cursor-based punch-in recording, manual note insertion, and persistent recognition tuning.
+An offline Flutter prototype that turns a single sung melody into editable-ready musical data and dynamically rendered notation. Phase 1 supports treble and bass clefs, selectable octave ranges, all 15 standard major key signatures, live YIN pitch detection, syllable-aware note segmentation, rhythm quantization (including dotted values), automatic 4/4 measures, tied bar-line splits, GeneralUser GS sampled-instrument playback, a tempo-synchronized metronome, cursor-based punch-in recording, manual note insertion, and persistent recognition tuning.
 
 Octave-clef ranges follow standard sounding-pitch direction: **8 up** writes the captured pitch one octave lower and plays it one octave above the written note; **8 down** writes it one octave higher and plays it one octave below. The same rule applies to manual notes and edit previews.
 
@@ -50,7 +50,7 @@ Unit coverage includes synthetic A4 detection, stable-note segmentation, duratio
 - `lib/transcription`: conversion of timestamped raw note events into tick-based notation and measures.
 - `lib/models`: composition, raw detection, and notation data.
 - `lib/notation`: a data-driven `CustomPainter` score renderer.
-- `lib/services/score_playback_service.dart`: offline piano-style WAV synthesis and playback.
+- `lib/services/score_playback_service.dart`: offline GeneralUser GS SoundFont rendering and WAV playback.
 - `lib/screens` and `lib/widgets`: navigation, live diagnostics, controls, and tuning UI.
 - `lib/services`: local settings persistence.
 
@@ -61,3 +61,7 @@ No network, backend, account, AI model, or cloud service is used.
 The mobile Open With / Share flow also accepts `.mscz` archives and uncompressed `.mscx` scores (MuseScore 3/4). These contain native MuseScore XML, not MusicXML. The offline importer reads the first melody staff/voice, including notes, rests, dotted durations, key and time signatures, clef, tempo, ties, numbered lyrics, repeats, and alternate endings. Unsupported fine rhythms and tuplets report an import error instead of silently changing their timing.
 
 Imported scores use the same editing, playback, practice, and testing tools as MusicXML. Save creates an app-authored `.mxl` copy; it does not rewrite the original MuseScore file. MuseScore page layout, mixer settings, accompaniment, and extra staves are outside the app's single-melody model.
+
+### GeneralUser GS sound library
+
+The instrument chip opens 37 curated GeneralUser GS presets grouped as Keyboards, Strings, and Winds. Piano, organs, guitar, bass, bowed strings, harp, brass, reeds, and flute-family instruments are available offline. Drum kits, percussion, synth pads/leads and sound effects are excluded from the picker. Playback, note previews and the test-result reference use the sampled bank in a background isolate. The bundled bank adds about 31 MB; no download is required at runtime. Credits and the complete bank license are available from **Playback instrument → Sound library licenses**. See [playback sound implementation](docs/playback-sound-options.md).

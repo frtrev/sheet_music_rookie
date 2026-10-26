@@ -1,4 +1,5 @@
 import '../models/playback_instrument.dart';
+import '../audio/general_user_soundfont.dart';
 
 import 'dart:async';
 
@@ -935,20 +936,41 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         children: [
           const Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
-            child: Text('Built-in sounds · available offline'),
+            child: Text('GeneralUser GS · sampled instruments · offline'),
           ),
-          for (final instrument in PlaybackInstrument.values)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, instrument),
-              child: Row(
-                children: [
-                  Expanded(child: Text(instrument.label)),
-                  if (instrument ==
-                      _engine.composition.value.playbackInstrument)
-                    const Icon(Icons.check),
-                ],
+          for (final family in ['Keyboards', 'Strings', 'Winds']) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
+              child: Text(
+                family,
+                style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
+            for (final instrument in PlaybackInstrument.values.where(
+              (i) => i.family == family,
+            ))
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, instrument),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(instrument.label)),
+                    if (instrument ==
+                        _engine.composition.value.playbackInstrument)
+                      const Icon(Icons.check),
+                  ],
+                ),
+              ),
+          ],
+          TextButton(
+            onPressed: () {
+              GeneralUserSoundFont.registerLicenses();
+              showLicensePage(
+                context: context,
+                applicationName: 'Sheet Music Rookie',
+              );
+            },
+            child: const Text('Sound library licenses'),
+          ),
         ],
       ),
     );

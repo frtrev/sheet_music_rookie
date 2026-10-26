@@ -3,6 +3,9 @@ import 'dart:math' as math;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:dart_melty_soundfont/dart_melty_soundfont.dart' as sf;
+
+import '../audio/general_user_soundfont.dart';
 
 import '../models/composition.dart';
 import '../audio/instrument_voice.dart';
@@ -58,7 +61,11 @@ class ScorePlaybackService {
       microseconds: (performedTick * 60000000 / (composition.tempoBpm * 480))
           .round(),
     );
-    final bytes = await compute(_renderPianoWave, plan.expanded);
+    final bank = await GeneralUserSoundFont.load();
+    final bytes = await compute(_renderPianoWave, (
+      composition: plan.expanded,
+      soundFont: bank,
+    ));
     _plan = plan;
     if (bytes == null) return false;
     await _player.stop();
@@ -105,8 +112,11 @@ class ScorePlaybackService {
   }
 }
 
-Uint8List? _renderPianoWave(Composition composition) =>
-    const PianoWaveSynthesizer().render(composition);
+Uint8List? _renderPianoWave(
+  ({Composition composition, Uint8List soundFont}) request,
+) =>
+    PianoWaveSynthesizer(soundFont: ByteData.sublistView(request.soundFont))
+        .render(request.composition);
 
 int playbackMidiPitch(
   Composition composition,
@@ -123,13 +133,13 @@ int playbackMidiPitch(
       .toInt();
 }
 
-/// Produces a self-contained mono WAV with selectable modeled instruments.
-/// Generating it in memory keeps playback fully offline and avoids a
-/// large sample or SoundFont dependency.
+/// Renders the selected SoundFont instrument to an offline mono WAV.
+/// Calls without a supplied bank retain the legacy modeled voices.
 class PianoWaveSynthesizer {
-  const PianoWaveSynthesizer({this.sampleRate = 24000});
+  const PianoWaveSynthesizer({this.sampleRate = 24000, this.soundFont});
 
   final int sampleRate;
+  final ByteData? soundFont;
 
   Uint8List? render(Composition source) {
     final composition = PerformancePlan(source).expanded;
@@ -141,33 +151,39 @@ class PianoWaveSynthesizer {
       1,
       (totalTicks * secondsPerTick * sampleRate).ceil(),
     );
-    final samples = Float64List(sampleCount);
+    final samples = Float64List(
+      sampleCount + (soundFont == null ? 0 : (sampleRate * .35).round()),
+    );
 
-    for (final tone in tones) {
-      final frequency = 440 * math.pow(2, (tone.midiPitch - 69) / 12);
-      final startSample = (tone.startTick * secondsPerTick * sampleRate)
-          .round();
-      final toneSamples = (tone.durationTicks * secondsPerTick * sampleRate)
-          .round();
-      final voice = InstrumentVoice(
-        composition.playbackInstrument,
-        frequency.toDouble(),
-        sampleRate,
-      );
-      for (
-        var index = 0;
-        index < toneSamples && startSample + index < sampleCount;
-        index++
-      ) {
-        final time = index / sampleRate;
-        final remaining = (toneSamples - index) / sampleRate;
-        samples[startSample + index] +=
-            composition.playbackVolume * voice.sample(time, remaining);
+    if (soundFont != null) {
+      _renderSoundFont(samples, tones, composition, secondsPerTick);
+    } else {
+      for (final tone in tones) {
+        final frequency = 440 * math.pow(2, (tone.midiPitch - 69) / 12);
+        final startSample = (tone.startTick * secondsPerTick * sampleRate)
+            .round();
+        final toneSamples = (tone.durationTicks * secondsPerTick * sampleRate)
+            .round();
+        final voice = InstrumentVoice(
+          composition.playbackInstrument,
+          frequency.toDouble(),
+          sampleRate,
+        );
+        for (
+          var index = 0;
+          index < toneSamples && startSample + index < sampleCount;
+          index++
+        ) {
+          final time = index / sampleRate;
+          final remaining = (toneSamples - index) / sampleRate;
+          samples[startSample + index] +=
+              composition.playbackVolume * voice.sample(time, remaining);
+        }
       }
     }
 
     mixMetronomeClicks(
-      samples,
+      Float64List.sublistView(samples, 0, sampleCount),
       sampleRate: sampleRate,
       tempoBpm: composition.tempoBpm,
       beatsPerMeasure: composition.beatsPerMeasure,
@@ -181,6 +197,84 @@ class PianoWaveSynthesizer {
     );
 
     return _encodeWave(samples);
+  }
+
+  void _renderSoundFont(
+    Float64List samples,
+    List<_Tone> tones,
+    Composition composition,
+    double secondsPerTick,
+  ) {
+    final synth = sf.Synthesizer.loadByteData(
+      soundFont!,
+      sf.SynthesizerSettings(
+        sampleRate: sampleRate,
+        maximumPolyphony: 32,
+        enableReverbAndChorus: true,
+      ),
+    );
+    final preset = synth.soundFont.presets.indexWhere(
+      (p) =>
+          p.bankNumber == 0 &&
+          p.patchNumber == composition.playbackInstrument.midiProgram - 1,
+    );
+    if (preset < 0) {
+      throw StateError(
+        'The selected instrument is missing from GeneralUser GS.',
+      );
+    }
+    synth.selectPreset(channel: 0, preset: preset);
+    final events = <({int sample, int pitch, bool on})>[];
+    for (final tone in tones) {
+      events.add((
+        sample: (tone.startTick * secondsPerTick * sampleRate).round(),
+        pitch: tone.midiPitch,
+        on: true,
+      ));
+      events.add((
+        sample:
+            ((tone.startTick + tone.durationTicks) *
+                    secondsPerTick *
+                    sampleRate)
+                .round(),
+        pitch: tone.midiPitch,
+        on: false,
+      ));
+    }
+    events.sort((a, b) {
+      final time = a.sample.compareTo(b.sample);
+      return time != 0 ? time : (a.on ? 1 : 0).compareTo(b.on ? 1 : 0);
+    });
+    final left = Float32List(1024);
+    final right = Float32List(1024);
+    var position = 0;
+    void renderUntil(int end) {
+      while (position < end) {
+        final count = math.min(left.length, end - position);
+        final l = Float32List.sublistView(left, 0, count);
+        final r = Float32List.sublistView(right, 0, count);
+        synth.render(l, r);
+        for (var i = 0; i < count; i++) {
+          samples[position + i] =
+              (l[i] + r[i]) * .5 * composition.playbackVolume;
+        }
+        position += count;
+      }
+    }
+
+    for (final event in events) {
+      renderUntil(event.sample.clamp(0, samples.length));
+      if (event.on) {
+        synth.noteOn(channel: 0, key: event.pitch, velocity: 90);
+      } else {
+        synth.noteOff(channel: 0, key: event.pitch);
+      }
+    }
+    renderUntil(samples.length);
+    final fadeSamples = (sampleRate * .01).round();
+    for (var i = 0; i < fadeSamples; i++) {
+      samples[samples.length - 1 - i] *= i / fadeSamples;
+    }
   }
 
   List<_Tone> _collectTones(Composition composition) {

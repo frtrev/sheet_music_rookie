@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../audio/general_user_soundfont.dart';
+
 import '../audio/microphone_service.dart';
 import '../audio/voice_polish.dart';
 import '../models/composition.dart';
@@ -24,7 +26,7 @@ class MelodyTestResult {
 }
 
 /// Captures one sung attempt, compares it with the score, and creates a WAV
-/// that overlays the optionally polished voice with the same piano reference used by
+/// that overlays the optionally polished voice with the same instrument reference used by
 /// normal score playback.
 class MelodyTestSession {
   factory MelodyTestSession(
@@ -122,9 +124,12 @@ class MelodyTestSession {
     return timelineStarted && _currentPerformanceTick == _scoreEndTick;
   }
 
-  Future<MelodyTestResult> finishAsync() => compute(_finishSession, this);
+  Future<MelodyTestResult> finishAsync() async {
+    final bank = await GeneralUserSoundFont.load();
+    return compute(_finishSession, (session: this, soundFont: bank));
+  }
 
-  MelodyTestResult finish() {
+  MelodyTestResult finish({ByteData? soundFont}) {
     if (_attemptStartMs == null ||
         _firstVoiceMs == null ||
         _lastVoiceMs == null ||
@@ -141,7 +146,7 @@ class MelodyTestSession {
       score: (scores.pitch * .75 + scores.timing * .25).round().clamp(0, 100),
       pitchScore: scores.pitch.round().clamp(0, 100),
       timingScore: scores.timing.round().clamp(0, 100),
-      matchupWave: _renderMatchup(),
+      matchupWave: _renderMatchup(soundFont: soundFont),
     );
   }
 
@@ -226,9 +231,11 @@ class MelodyTestSession {
     return null;
   }
 
-  Uint8List? _renderMatchup() {
-    final reference = PianoWaveSynthesizer(sampleRate: outputSampleRate)
-        .render(composition);
+  Uint8List? _renderMatchup({ByteData? soundFont}) {
+    final reference = PianoWaveSynthesizer(
+      sampleRate: outputSampleRate,
+      soundFont: soundFont,
+    ).render(composition);
     if (reference == null || _audioSamples.isEmpty) return reference;
     final referenceSamples = _decodeWave(reference);
     final sourceStartMs = _attemptStartMs!;
@@ -266,7 +273,7 @@ class MelodyTestSession {
     for (var i = 0; i < polished.length; i++) {
       mixed[i] += polished[i] * 1.15;
     }
-    // Keep the final voice + piano mix below clipping when polish is enabled.
+    // Keep the final voice + reference mix below clipping when polish is enabled.
     if (voicePolish > 0) {
       var peak = 0.0;
       for (final sample in mixed) {
@@ -401,4 +408,6 @@ Uint8List _encodeWave(Float64List samples, int sampleRate) {
   return result;
 }
 
-MelodyTestResult _finishSession(MelodyTestSession session) => session.finish();
+MelodyTestResult _finishSession(
+  ({MelodyTestSession session, Uint8List soundFont}) request,
+) => request.session.finish(soundFont: ByteData.sublistView(request.soundFont));

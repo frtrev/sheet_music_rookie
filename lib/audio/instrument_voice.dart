@@ -7,10 +7,10 @@ import '../models/playback_instrument.dart';
 class InstrumentVoice {
   InstrumentVoice(this.instrument, this.frequency, int sampleRate) {
     final weights = switch (instrument) {
-      PlaybackInstrument.piano => [1.0, .3, .14, .065, .035, .018, .009, .005],
       PlaybackInstrument.nylonGuitar => [1.0, .27, .12, .065, .035, .02],
       PlaybackInstrument.flute => [1.0, .09, .025],
       PlaybackInstrument.organ => [1.0, .35, .16, .075],
+      _ => [1.0, .3, .14, .065, .035, .018, .009, .005],
     };
     for (var i = 0; i < weights.length; i++) {
       final harmonic = i + 1;
