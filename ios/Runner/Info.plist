@@ -30,7 +30,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>MusicXML Score</string>
+			<string>MusicXML and MuseScore Scores</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
@@ -40,6 +40,8 @@
 				<string>com.recordare.musicxml</string>
 				<string>com.recordare.musicxml.uncompressed</string>
 				<string>public.xml</string>
+				<string>org.musescore.mscz</string>
+				<string>org.musescore.mscx</string>
 			</array>
 		</dict>
 	</array>
@@ -80,6 +82,40 @@
 				<string>mxl</string>
 				<key>public.mime-type</key>
 				<string>application/vnd.recordare.musicxml</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.musescore.mscz</string>
+			<key>UTTypeDescription</key>
+			<string>MuseScore Score</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<string>mscz</string>
+				<key>public.mime-type</key>
+				<string>application/x-musescore</string>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>org.musescore.mscx</string>
+			<key>UTTypeDescription</key>
+			<string>MuseScore Score</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.xml</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<string>mscx</string>
+				<key>public.mime-type</key>
+				<string>application/x-musescore+xml</string>
 			</dict>
 		</dict>
 	</array>

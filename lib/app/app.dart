@@ -47,9 +47,7 @@ class _SheetMusicRookieAppState extends State<SheetMusicRookieApp> {
       _showImportedComposition(imported);
     } on Object {
       _messengerKey.currentState?.showSnackBar(
-        const SnackBar(
-          content: Text('This MusicXML file could not be opened.'),
-        ),
+        const SnackBar(content: Text('This score file could not be opened.')),
       );
     } finally {
       _openingFile = false;

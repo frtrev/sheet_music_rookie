@@ -55,3 +55,9 @@ Unit coverage includes synthetic A4 detection, stable-note segmentation, duratio
 - `lib/services`: local settings persistence.
 
 No network, backend, account, AI model, or cloud service is used.
+
+### MuseScore import
+
+The mobile Open With / Share flow also accepts `.mscz` archives and uncompressed `.mscx` scores (MuseScore 3/4). These contain native MuseScore XML, not MusicXML. The offline importer reads the first melody staff/voice, including notes, rests, dotted durations, key and time signatures, clef, tempo, ties, numbered lyrics, repeats, and alternate endings. Unsupported fine rhythms and tuplets report an import error instead of silently changing their timing.
+
+Imported scores use the same editing, playback, practice, and testing tools as MusicXML. Save creates an app-authored `.mxl` copy; it does not rewrite the original MuseScore file. MuseScore page layout, mixer settings, accompaniment, and extra staves are outside the app's single-melody model.

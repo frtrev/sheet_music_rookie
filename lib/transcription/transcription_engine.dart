@@ -10,12 +10,21 @@ import '../audio/pitch_smoother.dart';
 import '../models/composition.dart';
 import '../models/measure.dart';
 import '../models/musical_note.dart';
+import '../models/note_lyric.dart';
 import '../models/pitch_detection_result.dart';
 import '../models/raw_note_event.dart';
 import '../models/voice_detection_settings.dart';
 import '../services/settings_service.dart';
 import 'measure_builder.dart';
 import 'rhythm_quantizer.dart';
+
+class _ScoreSnapshot {
+  _ScoreSnapshot(this.composition, List<RawNoteEvent> events, this.cursor)
+    : events = List.unmodifiable(events);
+  final Composition composition;
+  final List<RawNoteEvent> events;
+  final int cursor;
+}
 
 class TranscriptionEngine {
   TranscriptionEngine({
@@ -60,6 +69,226 @@ class TranscriptionEngine {
   );
   final ValueNotifier<int> notationCursorTick = ValueNotifier(0);
   final ValueNotifier<Composition> composition;
+
+  static const historyLimit = 100;
+  final _undo = <_ScoreSnapshot>[];
+  final _redo = <_ScoreSnapshot>[];
+  _ScoreSnapshot? _recordingBefore;
+  _ScoreSnapshot? _punchInBefore;
+  final ValueNotifier<int> historyRevision = ValueNotifier(0);
+  bool get canUndo => _undo.isNotEmpty || _recordingBefore != null;
+  bool get canRedo => _redo.isNotEmpty && _recordingBefore == null;
+
+  _ScoreSnapshot _snapshot() =>
+      _ScoreSnapshot(composition.value, rawEvents, notationCursorTick.value);
+
+  bool _sameContent(_ScoreSnapshot a, _ScoreSnapshot b) {
+    bool lyricsEqual(List<NoteLyric> x, List<NoteLyric> y) =>
+        listEquals(x.map((l) => l.xml).toList(), y.map((l) => l.xml).toList());
+    if (a.events.length != b.events.length) return false;
+    for (var i = 0; i < a.events.length; i++) {
+      final x = a.events[i];
+      final y = b.events[i];
+      if (x.startTimeMs != y.startTimeMs ||
+          x.endTimeMs != y.endTimeMs ||
+          x.midiPitch != y.midiPitch ||
+          x.frequencyHz != y.frequencyHz ||
+          x.confidence != y.confidence ||
+          x.accidental != y.accidental ||
+          x.isRest != y.isRest ||
+          x.tieToNext != y.tieToNext ||
+          !lyricsEqual(x.lyrics, y.lyrics)) {
+        return false;
+      }
+    }
+    final x = a.composition;
+    final y = b.composition;
+    if (x.title != y.title ||
+        x.keySignature != y.keySignature ||
+        x.octaveRange != y.octaveRange ||
+        x.beatsPerMeasure != y.beatsPerMeasure ||
+        x.beatUnit != y.beatUnit ||
+        x.measures.length != y.measures.length) {
+      return false;
+    }
+    for (var i = 0; i < x.measures.length; i++) {
+      final m = x.measures[i];
+      final n = y.measures[i];
+      if (m.beatsPerMeasure != n.beatsPerMeasure ||
+          m.beatUnit != n.beatUnit ||
+          !listEquals(m.barlines, n.barlines) ||
+          m.notes.length != n.notes.length) {
+        return false;
+      }
+      for (var j = 0; j < m.notes.length; j++) {
+        final p = m.notes[j];
+        final q = n.notes[j];
+        if (p.midiPitch != q.midiPitch ||
+            p.startTick != q.startTick ||
+            p.durationTicks != q.durationTicks ||
+            p.accidental != q.accidental ||
+            p.flatSpelling != q.flatSpelling ||
+            p.isRest != q.isRest ||
+            p.tieFromPrevious != q.tieFromPrevious ||
+            p.tieToNext != q.tieToNext ||
+            !lyricsEqual(p.lyrics, q.lyrics)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  void _remember(_ScoreSnapshot before) {
+    _undo.add(before);
+    if (_undo.length > historyLimit) _undo.removeAt(0);
+    _redo.clear();
+    historyRevision.value++;
+  }
+
+  T _edit<T>(T Function() action) {
+    if (isPunchingIn) _finishPunchIn();
+    final before = _snapshot();
+    final result = action();
+    if (!_sameContent(before, _snapshot())) _remember(before);
+    return result;
+  }
+
+  void _beginRecordingChange() {
+    if (_recordingBefore != null) return;
+    _recordingBefore = _punchInBefore ?? _snapshot();
+    historyRevision.value++;
+  }
+
+  void _restore(_ScoreSnapshot snapshot) {
+    final current = composition.value;
+    _segmenter.reset();
+    _smoother.clear();
+    _lastRenderedActiveTicks = 0;
+    _punchInBase = null;
+    _punchInEvents.clear();
+    _recordingBefore = null;
+    _punchInBefore = null;
+    currentNoteDurationMs.value = 0;
+    rawEvents
+      ..clear()
+      ..addAll(snapshot.events);
+    notationCursorTick.value = snapshot.cursor;
+    composition.value = snapshot.composition.copyWith(
+      microphoneActive: current.microphoneActive,
+      metronomeMode: current.metronomeMode,
+      playbackVolume: current.playbackVolume,
+      metronomeVolume: current.metronomeVolume,
+    );
+    historyRevision.value++;
+  }
+
+  void _finishForHistory() {
+    final event = _segmenter.finish(
+      livePitch.value?.timestampMs ?? 0,
+      settings.value,
+    );
+    if (event != null && _captureEnabled) _commitFinalized(event);
+    if (isPunchingIn) _finishPunchIn();
+    if (_recordingBefore != null) {
+      _recordingBefore = null;
+      _rebuildComposition();
+      historyRevision.value++;
+    }
+  }
+
+  bool undo() {
+    _finishForHistory();
+    if (_undo.isEmpty) return false;
+    _redo.add(_snapshot());
+    _restore(_undo.removeLast());
+    return true;
+  }
+
+  bool redo() {
+    _finishForHistory();
+    if (_redo.isEmpty) return false;
+    _undo.add(_snapshot());
+    _restore(_redo.removeLast());
+    return true;
+  }
+
+  void overwriteFromTick(int tick, List<RawNoteEvent> events) =>
+      _edit(() => _overwriteFromTick(tick, events));
+  bool? toggleTieAtTick(int tick) => _edit(() => _toggleTieAtTick(tick));
+  bool removeNoteAtTick(int tick) => _edit(() => _removeNoteAtTick(tick));
+  int insertMeasureAfterTick(int tick) =>
+      _edit(() => _insertMeasureAfterTick(tick));
+  void setMeasureTimeSignatureAtTick(
+    int tick, {
+    required int beatsPerMeasure,
+    required int beatUnit,
+  }) => _edit(
+    () => _setMeasureTimeSignatureAtTick(
+      tick,
+      beatsPerMeasure: beatsPerMeasure,
+      beatUnit: beatUnit,
+    ),
+  );
+  ({int midiPitch, int durationTicks, bool isRest})? toggleRestAtTick(
+    int tick,
+  ) => _edit(() => _toggleRestAtTick(tick));
+  ({int midiPitch, int durationTicks, bool isRest})? toggleNoteAtTick(
+    int tick,
+  ) => _edit(() {
+    if (eventIndexAtTick(tick) != null) return _toggleRestAtTick(tick);
+    final inserted = _toggleRestAtTick(tick);
+    if (inserted == null) return null;
+    return _toggleRestAtTick(notationCursorTick.value);
+  });
+  ({int midiPitch, int durationTicks, bool isRest})? writeNoteAtTick(
+    int tick,
+  ) => _edit(() {
+    final index = eventIndexAtTick(tick);
+    if (index != null && !rawEvents[index].isRest) {
+      final (start, end) = _tiedGroupBounds(index);
+      return (
+        midiPitch: rawEvents[start].midiPitch,
+        durationTicks: _totalTicks(rawEvents.sublist(start, end + 1)),
+        isRest: false,
+      );
+    }
+    if (index != null) return _toggleRestAtTick(tick);
+    final inserted = _toggleRestAtTick(tick);
+    if (inserted == null) return null;
+    return _toggleRestAtTick(notationCursorTick.value);
+  });
+
+  ({int midiPitch, int durationTicks, bool isRest})? writeRestAtTick(
+    int tick,
+  ) => _edit(() {
+    final index = eventIndexAtTick(tick);
+    if (index != null && rawEvents[index].isRest) {
+      return (
+        midiPitch: 0,
+        durationTicks: _ticksFor(rawEvents[index]),
+        isRest: true,
+      );
+    }
+    return _toggleRestAtTick(tick);
+  });
+
+  ({int midiPitch, int durationTicks})? editNoteAtTick(
+    int tick, {
+    int pitchDelta = 0,
+    int durationDelta = 0,
+  }) => _edit(
+    () => _editNoteAtTick(
+      tick,
+      pitchDelta: pitchDelta,
+      durationDelta: durationDelta,
+    ),
+  );
+  void setKeySignature(KeySignature value) =>
+      _edit(() => _setKeySignature(value));
+  void setOctaveRange(OctaveRange value) => _edit(() => _setOctaveRange(value));
+  void setTitle(String title) => _edit(() => _setTitle(title));
+  void clear() => _edit(_clear);
 
   bool get isPunchingIn => _punchInBase != null;
   bool get captureEnabled => _captureEnabled;
@@ -114,6 +343,9 @@ class TranscriptionEngine {
     composition.value = composition.value.copyWith(microphoneActive: false);
     microphoneStatus.value = MicrophoneStatus.paused;
     currentNoteDurationMs.value = 0;
+    _recordingBefore = null;
+    _punchInBefore = null;
+    historyRevision.value++;
   }
 
   void _processFrame(AudioFrame frame) {
@@ -141,6 +373,10 @@ class TranscriptionEngine {
         frame.timestampMs,
         settings.value,
       );
+      if (_captureEnabled &&
+          (update.active != null || update.finalized != null)) {
+        _beginRecordingChange();
+      }
       final punchInEnded =
           _captureEnabled &&
           update.finalized != null &&
@@ -148,6 +384,10 @@ class TranscriptionEngine {
           !isVoice;
       if (_captureEnabled && update.finalized != null) {
         _commitFinalized(update.finalized!, endPunchIn: punchInEnded);
+        if (!isPunchingIn && update.active != null) {
+          _rebuildComposition();
+          _beginRecordingChange();
+        }
       }
       currentNoteDurationMs.value = update.active?.durationMs ?? 0;
       final activeTicks = update.active == null
@@ -210,6 +450,7 @@ class TranscriptionEngine {
     _smoother.clear();
     _lastRenderedActiveTicks = 0;
     currentNoteDurationMs.value = 0;
+    _punchInBefore = _snapshot();
     _punchInBase = [...rawEvents];
     _punchInEvents.clear();
     _punchInStartTick = _eventStartAtTick(tick);
@@ -217,7 +458,7 @@ class TranscriptionEngine {
     _rebuildComposition();
   }
 
-  void overwriteFromTick(int tick, List<RawNoteEvent> events) {
+  void _overwriteFromTick(int tick, List<RawNoteEvent> events) {
     final startTick = tick.clamp(0, _totalTicks(rawEvents)).toInt();
     final updated = _spliceEvents(rawEvents, startTick, events);
     rawEvents
@@ -272,7 +513,7 @@ class TranscriptionEngine {
     return index != null && rawEvents[index].tieToNext;
   }
 
-  bool? toggleTieAtTick(int tick) {
+  bool? _toggleTieAtTick(int tick) {
     final index = eventIndexAtTick(tick);
     if (index == null) return null;
     final original = rawEvents[index];
@@ -288,7 +529,7 @@ class TranscriptionEngine {
     return true;
   }
 
-  bool removeNoteAtTick(int tick) {
+  bool _removeNoteAtTick(int tick) {
     if (isPunchingIn) _finishPunchIn();
     final index = eventIndexAtTick(tick);
     if (index == null) return false;
@@ -303,7 +544,7 @@ class TranscriptionEngine {
   /// Inserts one complete silent measure after the measure containing [tick].
   /// The cursor's exact position is intentionally ignored so notes are never
   /// split except at the measure boundary itself.
-  int insertMeasureAfterTick(int tick) {
+  int _insertMeasureAfterTick(int tick) {
     if (isPunchingIn) _finishPunchIn();
     final current = composition.value;
     final totalTicks = _totalTicks(rawEvents);
@@ -382,7 +623,7 @@ class TranscriptionEngine {
     return insertionTick;
   }
 
-  void setMeasureTimeSignatureAtTick(
+  void _setMeasureTimeSignatureAtTick(
     int tick, {
     required int beatsPerMeasure,
     required int beatUnit,
@@ -475,7 +716,7 @@ class TranscriptionEngine {
     return tick >= totalTicks && tick < editableEnd;
   }
 
-  ({int midiPitch, int durationTicks, bool isRest})? toggleRestAtTick(
+  ({int midiPitch, int durationTicks, bool isRest})? _toggleRestAtTick(
     int tick,
   ) {
     final eventIndex = eventIndexAtTick(tick);
@@ -525,20 +766,30 @@ class TranscriptionEngine {
 
     if (!canToggleRestAtTick(tick)) return null;
     final totalTicks = _totalTicks(rawEvents);
-    if (tick > totalTicks) _appendRestDuration(tick - totalTicks);
-    final measureIndex = composition.value.measureIndexAtTick(tick);
-    final capacity = composition.value.measureCapacityTicks(measureIndex);
-    final positionInMeasure =
-        tick - composition.value.measureStartTick(measureIndex);
-    final available = positionInMeasure == 0
-        ? capacity
-        : capacity - positionInMeasure;
-    final value = NoteValue.values.reversed.firstWhere(
-      (candidate) => candidate.ticks <= math.min(480, available),
+    final score = composition.value;
+    final measureIndex = score.measureIndexAtTick(tick);
+    final measureStart = score.measureStartTick(measureIndex);
+    final capacity = score.measureCapacityTicks(measureIndex);
+    final unit = score.measures[measureIndex].effectiveBeatUnit(score.beatUnit);
+    final beatTicks = 1920 ~/ unit;
+    final localTick = tick - measureStart;
+    // Exact halfway taps choose the earlier beat. Stay inside this measure
+    // and never overwrite an existing note just to align a new rest.
+    var beat = ((localTick + beatTicks ~/ 2 - 1) ~/ beatTicks).clamp(
+      0,
+      capacity ~/ beatTicks - 1,
     );
-    _appendRestDuration(value.ticks);
+    var snappedTick = measureStart + beat * beatTicks;
+    if (snappedTick < totalTicks) {
+      beat = (totalTicks - measureStart + beatTicks - 1) ~/ beatTicks;
+      snappedTick = measureStart + beat * beatTicks;
+    }
+    if (snappedTick + beatTicks > measureStart + capacity) return null;
+    if (snappedTick > totalTicks) _appendRestDuration(snappedTick - totalTicks);
+    _appendRestDuration(beatTicks);
+    notationCursorTick.value = snappedTick;
     _rebuildComposition();
-    return (midiPitch: 0, durationTicks: value.ticks, isRest: true);
+    return (midiPitch: 0, durationTicks: beatTicks, isRest: true);
   }
 
   void _appendRestDuration(int ticks) {
@@ -568,7 +819,7 @@ class TranscriptionEngine {
     assert(remaining == 0, 'Rest duration must align to the notation grid.');
   }
 
-  ({int midiPitch, int durationTicks})? editNoteAtTick(
+  ({int midiPitch, int durationTicks})? _editNoteAtTick(
     int tick, {
     int pitchDelta = 0,
     int durationDelta = 0,
@@ -588,12 +839,23 @@ class TranscriptionEngine {
     final nextValueIndex = (originalValueIndex + durationDelta)
         .clamp(0, NoteValue.values.length - 1)
         .toInt();
-    final nextValue = NoteValue.values[nextValueIndex];
+    final nextValue = durationDelta < 0
+        ? NoteValue.values.reversed.firstWhere(
+            (value) => value.ticks <= originalTicks / 2,
+            orElse: () => NoteValue.sixteenth,
+          )
+        : NoteValue.values[nextValueIndex];
     final groupPitch = rawEvents[groupStart].midiPitch;
     final nextMidi = (groupPitch + pitchDelta).clamp(0, 127).toInt();
     final isBlackKey = const {1, 3, 6, 8, 10}.contains(nextMidi % 12);
     final writtenPitchClass =
         (nextMidi - composition.value.octaveRange.semitones) % 12;
+    if (nextMidi == groupPitch && nextValue.ticks == originalTicks) {
+      return (
+        midiPitch: groupPitch,
+        durationTicks: _totalTicks(rawEvents.sublist(groupStart, groupEnd + 1)),
+      );
+    }
     final accidental = pitchDelta == 0
         ? rawEvents[groupStart].accidental
         : isBlackKey
@@ -623,6 +885,27 @@ class TranscriptionEngine {
         tieToNext: event.tieToNext,
       );
     }
+    if (nextValue.ticks != originalTicks) {
+      final pieces = <({RawNoteEvent event, int ticks})>[];
+      var consumeRestTicks = math.max(0, nextValue.ticks - originalTicks);
+      for (final (index, event) in rawEvents.indexed) {
+        var ticks = _ticksFor(event);
+        if (index > groupEnd && consumeRestTicks > 0) {
+          if (event.isRest) {
+            final consumed = math.min(ticks, consumeRestTicks);
+            ticks -= consumed;
+            consumeRestTicks -= consumed;
+          } else {
+            consumeRestTicks = 0;
+          }
+        }
+        if (ticks > 0) pieces.add((event: event, ticks: ticks));
+        if (index == groupEnd && nextValue.ticks < originalTicks) {
+          pieces.addAll(_restPieces(originalTicks - nextValue.ticks));
+        }
+      }
+      _replaceWithPieces(pieces);
+    }
     _rebuildComposition();
     final groupTicks = rawEvents
         .sublist(groupStart, groupEnd + 1)
@@ -635,7 +918,10 @@ class TranscriptionEngine {
       _punchInEvents.add(event);
       if (endPunchIn) _finishPunchIn();
     } else {
+      final before = _recordingBefore ?? _snapshot();
       rawEvents.add(event);
+      _recordingBefore = null;
+      _remember(before);
       notationCursorTick.value = _totalTicks(rawEvents);
     }
   }
@@ -647,9 +933,12 @@ class TranscriptionEngine {
       // Merely moving the recording cursor is not an edit. Splicing an empty
       // replacement inside a note would divide that note at every tap.
       _punchInBase = null;
+      _punchInBefore = null;
+      _recordingBefore = null;
       notationCursorTick.value = _punchInStartTick;
       return;
     }
+    final before = _recordingBefore ?? _punchInBefore ?? _snapshot();
     final endTick = _punchInStartTick + _totalTicks(_punchInEvents);
     rawEvents
       ..clear()
@@ -657,6 +946,10 @@ class TranscriptionEngine {
     _punchInBase = null;
     _punchInEvents.clear();
     notationCursorTick.value = endTick;
+    _recordingBefore = null;
+    _punchInBefore = null;
+    _rebuildComposition();
+    if (!_sameContent(before, _snapshot())) _remember(before);
   }
 
   int _eventStartAtTick(int requestedTick) {
@@ -760,12 +1053,13 @@ class TranscriptionEngine {
     );
   }
 
-  void setKeySignature(KeySignature keySignature) {
+  void _setKeySignature(KeySignature keySignature) {
+    if (keySignature == composition.value.keySignature) return;
     composition.value = composition.value.copyWith(keySignature: keySignature);
     _rebuildComposition();
   }
 
-  void setOctaveRange(OctaveRange octaveRange) {
+  void _setOctaveRange(OctaveRange octaveRange) {
     final previous = composition.value.octaveRange;
     if (previous == octaveRange) return;
     if (isPunchingIn) _finishPunchIn();
@@ -783,11 +1077,11 @@ class TranscriptionEngine {
     _rebuildComposition();
   }
 
-  void setTitle(String title) {
+  void _setTitle(String title) {
     composition.value = composition.value.copyWith(title: title.trim());
   }
 
-  void clear() {
+  void _clear() {
     rawEvents.clear();
     _segmenter.reset();
     _smoother.clear();
@@ -809,5 +1103,6 @@ class TranscriptionEngine {
     settings.dispose();
     notationCursorTick.dispose();
     composition.dispose();
+    historyRevision.dispose();
   }
 }

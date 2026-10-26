@@ -1,3 +1,4 @@
+import 'musescore_import.dart';
 import '../models/note_lyric.dart';
 
 import 'dart:convert';
@@ -189,34 +190,54 @@ class CompositionStorageService {
       }
       final scoreFile = _scoreFileIn(archive);
       if (scoreFile == null) {
-        throw const FormatException('No MusicXML score was found in the MXL.');
+        throw const FormatException(
+          'No supported score was found in the archive.',
+        );
       }
-      return _importMusicXml(
+      return _importScoreXml(
         utf8.decode(scoreFile.content),
         path,
         await file.stat(),
       );
     }
-    return _importMusicXml(utf8.decode(bytes), path, await file.stat());
+    return _importScoreXml(utf8.decode(bytes), path, await file.stat());
   }
 
   ArchiveFile? _scoreFileIn(Archive archive) {
+    bool supported(String name) =>
+        ['.musicxml', '.mscx', '.xml'].any(name.toLowerCase().endsWith);
     final container = archive.findFile('META-INF/container.xml');
     if (container != null) {
       final document = XmlDocument.parse(utf8.decode(container.content));
-      final rootfile = document.findAllElements('rootfile').firstOrNull;
-      final fullPath = rootfile?.getAttribute('full-path');
-      if (fullPath != null) return archive.findFile(fullPath);
+      for (final rootfile in document.findAllElements('rootfile')) {
+        final path = rootfile.getAttribute('full-path');
+        if (path == null || !supported(path)) continue;
+        final file = archive.findFile(path);
+        if (file != null && file.isFile) return file;
+      }
     }
-    for (final file in archive.files) {
-      final name = file.name.toLowerCase();
-      if (file.isFile &&
-          !name.startsWith('meta-inf/') &&
-          (name.endsWith('.musicxml') || name.endsWith('.xml'))) {
-        return file;
+    for (final extension in ['.musicxml', '.mscx', '.xml']) {
+      for (final file in archive.files) {
+        final name = file.name.toLowerCase();
+        if (file.isFile &&
+            !name.startsWith('meta-inf/') &&
+            name.endsWith(extension)) {
+          return file;
+        }
       }
     }
     return null;
+  }
+
+  SavedComposition _importScoreXml(String source, String path, FileStat stat) {
+    final document = XmlDocument.parse(source);
+    return _importMusicXml(
+      document.rootElement.name.local == 'museScore'
+          ? museScoreToMusicXml(document)
+          : source,
+      path,
+      stat,
+    );
   }
 
   SavedComposition _importMusicXml(String source, String path, FileStat stat) {
@@ -445,7 +466,7 @@ class CompositionStorageService {
         .split(Platform.pathSeparator)
         .last
         .replaceFirst(
-          RegExp(r'\.(mxl|musicxml|xml)$', caseSensitive: false),
+          RegExp(r'\.(mxl|musicxml|xml|mscz|mscx)$', caseSensitive: false),
           '',
         );
     final composition = Composition(

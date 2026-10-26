@@ -444,6 +444,86 @@ void main() {
     expect(engine.notationCursorTick.value, 960);
   });
 
+  test('offbeat rest insertion snaps to one complete beat', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 500)]);
+    engine.notationCursorTick.value = 700;
+    final inserted = engine.toggleRestAtTick(700);
+    expect(inserted?.durationTicks, 480);
+    expect(engine.rawEvents.length, 2);
+    expect(engine.rawEvents.last.isRest, isTrue);
+    expect(engine.rawEvents.last.durationMs, 500);
+    expect(engine.composition.value.measures.first.notes.last.startTick, 480);
+    expect(engine.notationCursorTick.value, 480);
+    engine.undo();
+    expect(engine.rawEvents.length, 1);
+    expect(engine.notationCursorTick.value, 700);
+    engine.redo();
+    expect(engine.rawEvents.length, 2);
+    expect(engine.notationCursorTick.value, 480);
+  });
+
+  test('rest beat duration follows eighth and half-note time signatures', () {
+    for (final (beats, unit, ticks, milliseconds) in [
+      (6, 8, 240, 250),
+      (2, 2, 960, 1000),
+    ]) {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+        initialComposition: Composition(
+          clef: ClefType.treble,
+          beatsPerMeasure: beats,
+          beatUnit: unit,
+        ),
+      );
+      engine.overwriteFromTick(0, [rawEvent(60, milliseconds)]);
+      final cursor = ticks + ticks ~/ 3;
+      final result = engine.toggleRestAtTick(cursor);
+      expect(result?.durationTicks, ticks);
+      expect(engine.rawEvents.length, 2);
+      expect(engine.rawEvents.last.durationMs, milliseconds);
+      expect(engine.notationCursorTick.value, ticks);
+    }
+  });
+
+  test('rest snaps within the measure and uses local meter changes', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+      initialComposition: const Composition(
+        clef: ClefType.treble,
+        measures: [
+          Measure(index: 0, beatsPerMeasure: 3, beatUnit: 8),
+          Measure(index: 1, beatsPerMeasure: 2, beatUnit: 2),
+        ],
+      ),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 750)]);
+    final result = engine.toggleRestAtTick(1100);
+    expect(result?.durationTicks, 960);
+    expect(engine.notationCursorTick.value, 720);
+    expect(engine.rawEvents.length, 2);
+    final empty = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    empty.toggleRestAtTick(1900);
+    expect(empty.notationCursorTick.value, 1440);
+    expect(
+      empty.composition.value.measures.first.notes.last.durationTicks,
+      480,
+    );
+    expect(empty.composition.value.measures.first.notes.last.startTick, 1440);
+  });
+
   test('selected note toggles its tie to the following note', () {
     final engine = TranscriptionEngine(
       clef: ClefType.treble,
@@ -489,6 +569,106 @@ void main() {
     expect(engine.rawEvents.map((event) => event.durationMs), [500, 750]);
     expect(lengthened, (midiPitch: 61, durationTicks: 1200));
     expect(engine.rawEvents.first.tieToNext, isTrue);
+  });
+
+  test(
+    'shortening a quarter in 2/4 leaves an eighth rest before the next note',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+        initialComposition: const Composition(
+          clef: ClefType.treble,
+          beatsPerMeasure: 2,
+        ),
+      );
+      engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(64, 500)]);
+      engine.notationCursorTick.value = 0;
+      final result = engine.editNoteAtTick(0, durationDelta: -1);
+      expect(result, (midiPitch: 60, durationTicks: 240));
+      final notes = engine.composition.value.measures.first.notes;
+      expect(notes.map((n) => n.durationTicks), [240, 240, 480]);
+      expect(notes.map((n) => n.isRest), [false, true, false]);
+      expect(notes.map((n) => n.startTick), [0, 240, 480]);
+      expect(engine.rawEvents.last.startTimeMs, 500);
+      engine.undo();
+      expect(engine.rawEvents.length, 2);
+      engine.redo();
+      expect(engine.rawEvents.length, 3);
+      expect(engine.composition.value.measures.first.notes.last.startTick, 480);
+      engine.editNoteAtTick(0, durationDelta: 1);
+      expect(engine.rawEvents.map((e) => e.isRest), [false, true, false]);
+      expect(engine.composition.value.measures.first.notes.last.startTick, 480);
+      engine.editNoteAtTick(0, durationDelta: 1);
+      expect(engine.rawEvents.length, 2);
+      expect(engine.rawEvents.last.startTimeMs, 500);
+    },
+  );
+
+  test('repeated shortening keeps the following note and bar in place', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(60, 2000), rawEvent(64, 500)]);
+    engine.editNoteAtTick(0, durationDelta: -1);
+    engine.editNoteAtTick(0, durationDelta: -1);
+    expect(engine.composition.value.measures[1].notes.first.midiPitch, 64);
+    expect(engine.composition.value.measures[1].notes.first.startTick, 0);
+    expect(engine.rawEvents.last.startTimeMs, 2000);
+    expect(
+      engine.composition.value.measures.first.notes.first.durationTicks,
+      480,
+    );
+  });
+
+  test('note button inserts at a beat and toggles an existing note or rest in one history step', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    final added = engine.toggleNoteAtTick(100);
+    expect(added, (midiPitch: 64, durationTicks: 480, isRest: false));
+    expect(engine.rawEvents.single.isRest, isFalse);
+    expect(engine.notationCursorTick.value, 0);
+    engine.undo();
+    expect(engine.rawEvents, isEmpty);
+    expect(engine.canUndo, isFalse);
+    engine.redo();
+    expect(engine.rawEvents.single.midiPitch, 64);
+    expect(engine.toggleNoteAtTick(0)?.isRest, isTrue);
+    expect(engine.toggleRestAtTick(0)?.isRest, isFalse);
+    expect(engine.toggleRestAtTick(0)?.isRest, isTrue);
+    expect(engine.toggleNoteAtTick(0)?.isRest, isFalse);
+  });
+
+  test('fixed note and rest actions never toggle back on repeated presses', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    expect(engine.writeNoteAtTick(100)?.isRest, isFalse);
+    final revision = engine.historyRevision.value;
+    final original = engine.rawEvents.single;
+    final sounded = engine.writeNoteAtTick(0);
+    expect(sounded, (midiPitch: 64, durationTicks: 480, isRest: false));
+    expect(engine.rawEvents.single, same(original));
+    expect(engine.historyRevision.value, revision);
+    expect(engine.writeRestAtTick(0)?.isRest, isTrue);
+    final restRevision = engine.historyRevision.value;
+    expect(engine.writeRestAtTick(0)?.isRest, isTrue);
+    expect(engine.historyRevision.value, restRevision);
+    expect(engine.writeNoteAtTick(0)?.isRest, isFalse);
+    engine.undo();
+    expect(engine.rawEvents.single.isRest, isTrue);
+    engine.writeRestAtTick(0);
+    expect(engine.canRedo, isTrue);
+    engine.redo();
+    expect(engine.rawEvents.single.isRest, isFalse);
   });
 
   test('ties cannot be added to a rest or without a following note', () {
