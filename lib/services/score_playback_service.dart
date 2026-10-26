@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/composition.dart';
+import '../audio/instrument_voice.dart';
 import '../music/performance_plan.dart';
 import '../models/musical_note.dart';
 import 'metronome_service.dart';
@@ -122,8 +123,8 @@ int playbackMidiPitch(
       .toInt();
 }
 
-/// Produces a self-contained mono WAV with a percussive, harmonic-rich piano
-/// timbre. Generating it in memory keeps playback fully offline and avoids a
+/// Produces a self-contained mono WAV with selectable modeled instruments.
+/// Generating it in memory keeps playback fully offline and avoids a
 /// large sample or SoundFont dependency.
 class PianoWaveSynthesizer {
   const PianoWaveSynthesizer({this.sampleRate = 24000});
@@ -148,6 +149,11 @@ class PianoWaveSynthesizer {
           .round();
       final toneSamples = (tone.durationTicks * secondsPerTick * sampleRate)
           .round();
+      final voice = InstrumentVoice(
+        composition.playbackInstrument,
+        frequency.toDouble(),
+        sampleRate,
+      );
       for (
         var index = 0;
         index < toneSamples && startSample + index < sampleCount;
@@ -155,17 +161,8 @@ class PianoWaveSynthesizer {
       ) {
         final time = index / sampleRate;
         final remaining = (toneSamples - index) / sampleRate;
-        final attack = (time / .008).clamp(0.0, 1.0);
-        final release = (remaining / .07).clamp(0.0, 1.0);
-        final envelope = attack * release * math.exp(-1.8 * time);
-        final phase = 2 * math.pi * frequency * time;
-        final timbre =
-            .72 * math.sin(phase) +
-            .20 * math.sin(phase * 2.002) +
-            .10 * math.sin(phase * 3.006) +
-            .045 * math.sin(phase * 4.012);
         samples[startSample + index] +=
-            .42 * composition.playbackVolume * envelope * timbre;
+            composition.playbackVolume * voice.sample(time, remaining);
       }
     }
 

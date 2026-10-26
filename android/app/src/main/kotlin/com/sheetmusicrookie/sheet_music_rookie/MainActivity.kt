@@ -53,9 +53,9 @@ class MainActivity : FlutterActivity() {
     private fun copyIncomingFile(uri: Uri): String? {
         if (uri.scheme == "file") return uri.path
         val displayName = queryDisplayName(uri) ?: "Shared Score.musicxml"
-        val safeName = displayName.replace(Regex("[^A-Za-z0-9._ -]"), "_")
-        val directory = File(cacheDir, "incoming-musicxml").apply { mkdirs() }
-        val destination = File(directory, "${System.currentTimeMillis()}-$safeName")
+        val safeName = displayName.substringAfterLast('/').substringAfterLast('\\')
+        val directory = File(File(cacheDir, "incoming-musicxml"), java.util.UUID.randomUUID().toString()).apply { mkdirs() }
+        val destination = File(directory, safeName)
         return try {
             contentResolver.openInputStream(uri)?.use { input ->
                 destination.outputStream().use { output -> input.copyTo(output) }

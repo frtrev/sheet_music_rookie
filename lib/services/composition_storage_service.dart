@@ -1,3 +1,4 @@
+import '../models/playback_instrument.dart';
 import 'musescore_import.dart';
 import '../models/note_lyric.dart';
 
@@ -154,6 +155,10 @@ class CompositionStorageService {
       beatsPerMeasure: beats,
       beatUnit: beatUnit,
       tempoBpm: tempo,
+      playbackInstrument: PlaybackInstrument.values.firstWhere(
+        (value) => value.name == data['playbackInstrument'],
+        orElse: () => PlaybackInstrument.piano,
+      ),
       clef: clef,
       octaveRange: octaveRange,
       recordingMode: RecordingMode.values.byName(
@@ -462,19 +467,38 @@ class CompositionStorageService {
             .firstOrNull
             ?.innerText
             .trim();
-    final fallbackTitle = path
+    var fallbackTitle = path
         .split(Platform.pathSeparator)
         .last
         .replaceFirst(
           RegExp(r'\.(mxl|musicxml|xml|mscz|mscx)$', caseSensitive: false),
           '',
         );
+    if (path.contains('incoming-musicxml') ||
+        path.contains('incoming-scores')) {
+      fallbackTitle = fallbackTitle.replaceFirst(
+        RegExp(
+          r'^(?:[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}|[0-9]{13,16})-',
+        ),
+        '',
+      );
+    }
+    final midiProgram = int.tryParse(
+      document.findAllElements('midi-program').firstOrNull?.innerText.trim() ??
+          '',
+    );
     final composition = Composition(
-      title: title == null || title.isEmpty ? fallbackTitle : title,
+      title: fallbackTitle.isNotEmpty
+          ? fallbackTitle
+          : (title == null || title.isEmpty ? 'Imported score' : title),
       keySignature: keySignature,
       beatsPerMeasure: beats,
       beatUnit: beatUnit,
       tempoBpm: tempo,
+      playbackInstrument: PlaybackInstrument.values.firstWhere(
+        (value) => value.midiProgram == midiProgram,
+        orElse: () => PlaybackInstrument.piano,
+      ),
       clef: clef,
       octaveRange: octaveRange,
       microphoneActive: false,
@@ -559,6 +583,7 @@ class CompositionStorageService {
         },
     ],
     'tempoBpm': composition.tempoBpm,
+    'playbackInstrument': composition.playbackInstrument.name,
     'recordingMode': composition.recordingMode.name,
     'metronomeMode': composition.metronomeMode.name,
     'metronomeVolume': composition.metronomeVolume,
@@ -611,7 +636,7 @@ class CompositionStorageService {
         '  <identification><encoding><software>Sheet Music Rookie</software></encoding></identification>',
       )
       ..writeln(
-        '  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>',
+        '  <part-list><score-part id="P1"><part-name>Voice</part-name><score-instrument id="I1"><instrument-name>${composition.playbackInstrument.label}</instrument-name></score-instrument><midi-instrument id="I1"><midi-channel>1</midi-channel><midi-program>${composition.playbackInstrument.midiProgram}</midi-program></midi-instrument></score-part></part-list>',
       )
       ..writeln('  <part id="P1">');
     int? previousBeats;

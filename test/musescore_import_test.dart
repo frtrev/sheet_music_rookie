@@ -32,7 +32,7 @@ void main() {
       documentsDirectory: () async => root,
     );
     final imported = await storage.importFile(source.path);
-    expect(imported.composition.title, 'Test & canción');
+    expect(imported.composition.title, 'song');
     expect(imported.composition.tempoBpm, 120);
     expect(imported.composition.beatsPerMeasure, 2);
     expect(imported.composition.keySignature.accidentalCount, -1);

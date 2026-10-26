@@ -1,3 +1,5 @@
+import '../models/playback_instrument.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -856,6 +858,109 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     );
   }
 
+  Future<void> _prepareScoreSoundChange() async {
+    if (_testActive) await _stopTest(showResults: false);
+    if (_practiceActive) await _stopPractice();
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    _pausedByUser = true;
+    if (_engine.microphoneStatus.value != MicrophoneStatus.paused) {
+      await _pauseRecording();
+    }
+  }
+
+  Future<void> _showTempoDialog() async {
+    final controller = TextEditingController(
+      text: '${_engine.composition.value.tempoBpm}',
+    );
+    final formKey = GlobalKey<FormState>();
+    final value = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tempo'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Beats per minute',
+              helperText: '20–400 BPM',
+            ),
+            validator: (value) {
+              final n = int.tryParse(value?.trim() ?? '');
+              return n == null || n < 20 || n > 400
+                  ? 'Enter a whole number from 20 to 400.'
+                  : null;
+            },
+            onFieldSubmitted: (_) {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, int.parse(controller.text.trim()));
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(context, int.parse(controller.text.trim()));
+              }
+            },
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null ||
+        !mounted ||
+        value == _engine.composition.value.tempoBpm) {
+      return;
+    }
+    await _prepareScoreSoundChange();
+    if (mounted) _engine.setTempoBpm(value);
+  }
+
+  Future<void> _showInstrumentDialog() async {
+    final value = await showDialog<PlaybackInstrument>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Playback instrument'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text('Built-in sounds · available offline'),
+          ),
+          for (final instrument in PlaybackInstrument.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, instrument),
+              child: Row(
+                children: [
+                  Expanded(child: Text(instrument.label)),
+                  if (instrument ==
+                      _engine.composition.value.playbackInstrument)
+                    const Icon(Icons.check),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (value == null ||
+        !mounted ||
+        value == _engine.composition.value.playbackInstrument) {
+      return;
+    }
+    await _prepareScoreSoundChange();
+    if (mounted) _engine.setPlaybackInstrument(value);
+  }
+
   Future<void> _showKeySignatureDialog() async {
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
@@ -1273,6 +1378,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         keySignature: composition.keySignature,
         tempoBpm: composition.tempoBpm,
         playbackVolume: composition.playbackVolume,
+        playbackInstrument: composition.playbackInstrument,
         measures: [
           Measure(
             index: 0,
@@ -1432,6 +1538,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                   onOctaveRangePressed: _showOctaveRangeDialog,
                   onTimeSignaturePressed: _showTimeSignatureDialog,
                   onVolumesPressed: _showVolumeDialog,
+                  onTempoPressed: _showTempoDialog,
+                  onInstrumentPressed: _showInstrumentDialog,
                   onMetronomeChanged: (mode) =>
                       unawaited(_changeMetronomeMode(mode)),
                 ),
@@ -2017,6 +2125,8 @@ class _CompositionHeader extends StatelessWidget {
     required this.onOctaveRangePressed,
     required this.onTimeSignaturePressed,
     required this.onVolumesPressed,
+    required this.onTempoPressed,
+    required this.onInstrumentPressed,
     required this.onMetronomeChanged,
   });
   final Composition composition;
@@ -2025,6 +2135,8 @@ class _CompositionHeader extends StatelessWidget {
   final VoidCallback onOctaveRangePressed;
   final VoidCallback onTimeSignaturePressed;
   final VoidCallback onVolumesPressed;
+  final VoidCallback onTempoPressed;
+  final VoidCallback onInstrumentPressed;
   final ValueChanged<MetronomeMode> onMetronomeChanged;
 
   @override
@@ -2058,12 +2170,22 @@ class _CompositionHeader extends StatelessWidget {
         onPressed: onTimeSignaturePressed,
         visualDensity: VisualDensity.compact,
       ),
-      _chip(Icons.speed, '${composition.tempoBpm} BPM'),
+      ActionChip(
+        avatar: const Icon(Icons.speed, size: 16),
+        label: Text('${composition.tempoBpm} BPM'),
+        onPressed: onTempoPressed,
+        visualDensity: VisualDensity.compact,
+      ),
       _chip(
         Icons.grid_view,
         '${composition.measures.length} measure${composition.measures.length == 1 ? '' : 's'}',
       ),
-      _chip(Icons.straighten, 'Fixed tempo'),
+      ActionChip(
+        avatar: const Icon(Icons.piano, size: 16),
+        label: Text(composition.playbackInstrument.label),
+        onPressed: onInstrumentPressed,
+        visualDensity: VisualDensity.compact,
+      ),
       ActionChip(
         avatar: Icon(
           composition.metronomeMode == MetronomeMode.off

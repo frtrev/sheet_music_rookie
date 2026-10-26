@@ -1,3 +1,4 @@
+import 'playback_instrument.dart';
 import 'measure.dart';
 
 enum ClefType { treble, bass }
@@ -81,6 +82,7 @@ class Composition {
     this.beatsPerMeasure = 4,
     this.beatUnit = 4,
     this.tempoBpm = 120,
+    this.playbackInstrument = PlaybackInstrument.piano,
     required this.clef,
     this.octaveRange = OctaveRange.standard,
     this.recordingMode = RecordingMode.fixedTempo,
@@ -96,6 +98,7 @@ class Composition {
   final int beatsPerMeasure;
   final int beatUnit;
   final int tempoBpm;
+  final PlaybackInstrument playbackInstrument;
   final ClefType clef;
   final OctaveRange octaveRange;
   final RecordingMode recordingMode;
@@ -151,13 +154,16 @@ class Composition {
     OctaveRange? octaveRange,
     int? beatsPerMeasure,
     int? beatUnit,
+    int? tempoBpm,
+    PlaybackInstrument? playbackInstrument,
   }) {
     return Composition(
       title: title ?? this.title,
       keySignature: keySignature ?? this.keySignature,
       beatsPerMeasure: beatsPerMeasure ?? this.beatsPerMeasure,
       beatUnit: beatUnit ?? this.beatUnit,
-      tempoBpm: tempoBpm,
+      tempoBpm: tempoBpm ?? this.tempoBpm,
+      playbackInstrument: playbackInstrument ?? this.playbackInstrument,
       clef: clef,
       octaveRange: octaveRange ?? this.octaveRange,
       recordingMode: recordingMode,

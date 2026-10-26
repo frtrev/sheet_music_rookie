@@ -1,3 +1,5 @@
+import '../models/playback_instrument.dart';
+
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -146,6 +148,8 @@ class TranscriptionEngine {
         x.octaveRange != y.octaveRange ||
         x.beatsPerMeasure != y.beatsPerMeasure ||
         x.beatUnit != y.beatUnit ||
+        x.tempoBpm != y.tempoBpm ||
+        x.playbackInstrument != y.playbackInstrument ||
         x.measures.length != y.measures.length) {
       return false;
     }
@@ -322,6 +326,22 @@ class TranscriptionEngine {
       durationDelta: durationDelta,
     ),
   );
+  void setPlaybackInstrument(PlaybackInstrument value) => _edit(() {
+    composition.value = composition.value.copyWith(playbackInstrument: value);
+  });
+
+  void setTempoBpm(int value) => _edit(() {
+    final next = value.clamp(20, 400);
+    final previous = composition.value.tempoBpm;
+    if (next == previous) return;
+    final pieces = [
+      for (final event in rawEvents) (event: event, ticks: _ticksFor(event)),
+    ];
+    composition.value = composition.value.copyWith(tempoBpm: next);
+    _replaceWithPieces(pieces);
+    _rebuildComposition();
+  });
+
   void setKeySignature(KeySignature value) =>
       _edit(() => _setKeySignature(value));
   void setOctaveRange(OctaveRange value) => _edit(() => _setOctaveRange(value));

@@ -57,14 +57,9 @@ import UIKit
         at: directory,
         withIntermediateDirectories: true
       )
-      let safeName = url.lastPathComponent.replacingOccurrences(
-        of: "[^A-Za-z0-9._ -]",
-        with: "_",
-        options: .regularExpression
-      )
-      let destination = directory.appendingPathComponent(
-        "\(UUID().uuidString)-\(safeName)"
-      )
+      let importDirectory = directory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+      try fileManager.createDirectory(at: importDirectory, withIntermediateDirectories: true)
+      let destination = importDirectory.appendingPathComponent(url.lastPathComponent)
       try fileManager.copyItem(at: url, to: destination)
       pendingFilePath = destination.path
       if notifyFlutter, let channel = incomingFileChannel {

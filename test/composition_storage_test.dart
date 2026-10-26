@@ -214,7 +214,7 @@ void main() {
 
     final imported = await service.importFile(file.path);
 
-    expect(imported.composition.title, 'Imported Waltz');
+    expect(imported.composition.title, 'external');
     expect(imported.composition.clef, ClefType.bass);
     expect(imported.composition.keySignature, KeySignature.fMajor);
     expect(imported.composition.beatsPerMeasure, 3);
@@ -277,7 +277,7 @@ void main() {
 
       final imported = await service.importFile(file.path);
 
-      expect(imported.composition.title, 'Imported Waltz');
+      expect(imported.composition.title, 'external');
       expect(imported.rawEvents.first.midiPitch, 58);
     },
   );
