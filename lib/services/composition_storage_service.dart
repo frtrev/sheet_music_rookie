@@ -292,6 +292,16 @@ class CompositionStorageService {
         .trim()
         .toUpperCase();
     if (clefSign == 'F') clef = ClefType.bass;
+    if (clefSign == 'C') {
+      final line = firstClef?.getElement('line')?.innerText.trim() ?? '3';
+      clef = switch (line) {
+        '3' => ClefType.alto,
+        '4' => ClefType.tenor,
+        _ => throw const FormatException(
+          'This C clef position is not supported.',
+        ),
+      };
+    }
     final clefOctaveChange = int.tryParse(
       firstClef?.getElement('clef-octave-change')?.innerText.trim() ?? '',
     );
@@ -669,7 +679,7 @@ class CompositionStorageService {
         }
         if (measure.index == 0) {
           buffer.writeln(
-            '        <clef><sign>${composition.clef == ClefType.treble ? 'G' : 'F'}</sign><line>${composition.clef == ClefType.treble ? 2 : 4}</line>$clefOctaveXml</clef>',
+            '        <clef><sign>${composition.clef.musicXmlSign}</sign><line>${composition.clef.musicXmlLine}</line>$clefOctaveXml</clef>',
           );
         }
         buffer.writeln('      </attributes>');

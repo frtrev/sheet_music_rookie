@@ -1,3 +1,5 @@
+enum RecordingAnalysisMode { live, phrase }
+
 enum PracticeDifficulty {
   beginner('Beginner', 'Keeps earned progress when the pitch is missed.'),
   medium('Medium', 'Resets progress for the current note.'),
@@ -10,6 +12,8 @@ enum PracticeDifficulty {
 
 class VoiceDetectionSettings {
   const VoiceDetectionSettings({
+    this.recordingAnalysisMode = RecordingAnalysisMode.live,
+    this.phraseSilenceMs = 1000,
     this.minimumFrequency = 65,
     this.maximumFrequency = 1200,
     this.minimumConfidence = 0.80,
@@ -25,6 +29,8 @@ class VoiceDetectionSettings {
     this.voicePolish = .35,
   });
 
+  final RecordingAnalysisMode recordingAnalysisMode;
+  final int phraseSilenceMs;
   final double minimumFrequency;
   final double maximumFrequency;
   final double minimumConfidence;
@@ -40,6 +46,8 @@ class VoiceDetectionSettings {
   final double voicePolish;
 
   VoiceDetectionSettings copyWith({
+    RecordingAnalysisMode? recordingAnalysisMode,
+    int? phraseSilenceMs,
     double? minimumFrequency,
     double? maximumFrequency,
     double? minimumConfidence,
@@ -55,6 +63,9 @@ class VoiceDetectionSettings {
     double? voicePolish,
   }) {
     return VoiceDetectionSettings(
+      recordingAnalysisMode:
+          recordingAnalysisMode ?? this.recordingAnalysisMode,
+      phraseSilenceMs: phraseSilenceMs ?? this.phraseSilenceMs,
       minimumFrequency: minimumFrequency ?? this.minimumFrequency,
       maximumFrequency: maximumFrequency ?? this.maximumFrequency,
       minimumConfidence: minimumConfidence ?? this.minimumConfidence,

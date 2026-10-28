@@ -58,6 +58,46 @@ class VoiceSettingsPanel extends StatelessWidget {
           formatter: (v) => '±${v.round()} cents',
           onChanged: (v) => onChanged(value.copyWith(pitchToleranceCents: v)),
         ),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Recording analysis'),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<RecordingAnalysisMode>(
+          initialValue: value.recordingAnalysisMode,
+          isExpanded: true,
+          items: const [
+            DropdownMenuItem(
+              value: RecordingAnalysisMode.live,
+              child: Text('Live'),
+            ),
+            DropdownMenuItem(
+              value: RecordingAnalysisMode.phrase,
+              child: Text('Review after a phrase'),
+            ),
+          ],
+          onChanged: (mode) {
+            if (mode != null) {
+              onChanged(value.copyWith(recordingAnalysisMode: mode));
+            }
+          },
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Phrase mode waits for silence, then shows a pitch trace and preview notes. Only accepted phrases are written to the score. Play or sing one note at a time.',
+        ),
+        if (value.recordingAnalysisMode == RecordingAnalysisMode.phrase)
+          _SettingSlider(
+            label: 'Phrase silence',
+            value: value.phraseSilenceMs.toDouble(),
+            min: 400,
+            max: 2500,
+            divisions: 21,
+            suffix: 'ms',
+            onChanged: (v) =>
+                onChanged(value.copyWith(phraseSilenceMs: v.round())),
+          ),
+        const SizedBox(height: 16),
         _SettingSlider(
           label: 'Automatic cursor position',
           value: value.cursorFollowFraction,

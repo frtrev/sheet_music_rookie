@@ -9,6 +9,15 @@ class SettingsService {
     final prefs = await SharedPreferences.getInstance();
     const defaults = VoiceDetectionSettings();
     return VoiceDetectionSettings(
+      recordingAnalysisMode: RecordingAnalysisMode.values.firstWhere(
+        (mode) =>
+            mode.name == prefs.getString('${_prefix}recordingAnalysisMode'),
+        orElse: () => defaults.recordingAnalysisMode,
+      ),
+      phraseSilenceMs:
+          (prefs.getInt('${_prefix}phraseSilenceMs') ??
+                  defaults.phraseSilenceMs)
+              .clamp(400, 2500),
       minimumFrequency:
           prefs.getDouble('${_prefix}minFrequency') ??
           defaults.minimumFrequency,
@@ -53,6 +62,11 @@ class SettingsService {
   Future<void> save(VoiceDetectionSettings value) async {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
+      prefs.setString(
+        '${_prefix}recordingAnalysisMode',
+        value.recordingAnalysisMode.name,
+      ),
+      prefs.setInt('${_prefix}phraseSilenceMs', value.phraseSilenceMs),
       prefs.setDouble('${_prefix}minFrequency', value.minimumFrequency),
       prefs.setDouble('${_prefix}maxFrequency', value.maximumFrequency),
       prefs.setDouble('${_prefix}confidence', value.minimumConfidence),

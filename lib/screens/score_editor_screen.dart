@@ -8,6 +8,8 @@ import 'package:flutter/scheduler.dart';
 
 import '../audio/microphone_service.dart';
 import '../models/composition.dart';
+import '../models/phrase_draft.dart';
+import '../widgets/phrase_review_panel.dart';
 import '../models/measure.dart';
 import '../models/musical_note.dart';
 import '../models/raw_note_event.dart';
@@ -96,6 +98,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.notationCursorTick.addListener(_notationCursorChanged);
     _engine.microphoneStatus.addListener(_microphoneStatusChanged);
     _engine.latestAudioFrame.addListener(_practiceFrameChanged);
+    _engine.phraseDraft.addListener(_phraseChanged);
     unawaited(_engine.initialize());
   }
 
@@ -106,6 +109,29 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       unawaited(_metronome.stop());
     }
     _syncScreenAwake();
+  }
+
+  void _phraseChanged() {
+    final draft = _engine.phraseDraft.value;
+    if (draft == null || draft.preview == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_scoreScroll.hasClients ||
+          _engine.phraseDraft.value != draft) {
+        return;
+      }
+      final tick = draft.stage == PhraseStage.review
+          ? draft.startTick
+          : (draft.trace.isEmpty ? draft.startTick : draft.trace.last.tick);
+      final target = ScoreLayout.scrollOffsetToFollowCursor(
+        cursorX: ScoreLayout.playbackCursorX(draft.preview!, tick),
+        currentOffset: _scoreScroll.offset,
+        viewportWidth: _scoreScroll.position.viewportDimension,
+        maxScrollExtent: _scoreScroll.position.maxScrollExtent,
+        followFraction: _engine.settings.value.cursorFollowFraction,
+      );
+      if (target != null) _scoreScroll.jumpTo(target);
+    });
   }
 
   void _transportWakeStateChanged() => _syncScreenAwake();
@@ -289,6 +315,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       await _stopPlayback(resumeListening: false);
       await _pauseRecording();
       if (!mounted) return;
+      if (_resolvePhraseFirst()) return;
       if (_importPending || _engine.hasUnsavedChanges) {
         final choice = await showDialog<String>(
           context: context,
@@ -330,6 +357,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _clear() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     await _notePreview.stop(resetPosition: true);
@@ -363,6 +391,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _save() async {
+    if (_resolvePhraseFirst()) return;
     if (_saving) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
@@ -446,6 +475,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _togglePlayback() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     await _notePreview.stop(resetPosition: true);
@@ -472,6 +502,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         status != MicrophoneStatus.unavailable &&
         status != MicrophoneStatus.paused;
     await _pauseRecording();
+    if (_resolvePhraseFirst()) return;
     final composition = _engine.composition.value;
     final endTick = ScoreLayout.scoreEndTick(composition);
     var startTick = _engine.notationCursorTick.value;
@@ -509,6 +540,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _togglePractice() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) {
       await _stopPractice();
@@ -536,6 +568,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (status != MicrophoneStatus.paused &&
         status != MicrophoneStatus.unavailable) {
       await _pauseRecording();
+      if (_resolvePhraseFirst()) return;
     }
     _engine.setCaptureEnabled(false);
     _practiceSession = session;
@@ -573,6 +606,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _toggleTest() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) {
       await _stopTest(showResults: true);
       return;
@@ -600,6 +634,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (status != MicrophoneStatus.paused &&
         status != MicrophoneStatus.unavailable) {
       await _pauseRecording();
+      if (_resolvePhraseFirst()) return;
     }
     _engine.setCaptureEnabled(false);
     _testSession = session;
@@ -691,7 +726,20 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     await _notePreview.stop(resetPosition: true);
   }
 
+  bool _resolvePhraseFirst() {
+    if (_engine.phraseDraft.value == null) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Accept or discard the recording phrase below the score first.',
+        ),
+      ),
+    );
+    return true;
+  }
+
   Future<void> _movePlaybackCursor(Duration position) async {
+    if (_resolvePhraseFirst()) return;
     await _notePreview.stop(resetPosition: true);
     if (_practiceActive || _testActive) return;
     _cancelAutomaticCursorScroll();
@@ -719,6 +767,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _startRecordingAtCursor() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     await _notePreview.stop(resetPosition: true);
@@ -731,6 +780,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showNoteMenu() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     await _notePreview.stop(resetPosition: true);
@@ -871,6 +921,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showTempoDialog() async {
+    if (_resolvePhraseFirst()) return;
     final controller = TextEditingController(
       text: '${_engine.composition.value.tempoBpm}',
     );
@@ -929,6 +980,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showInstrumentDialog() async {
+    if (_resolvePhraseFirst()) return;
     final value = await showDialog<PlaybackInstrument>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -984,6 +1036,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showKeySignatureDialog() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     if (!mounted) return;
@@ -1030,6 +1083,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showOctaveRangeDialog() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     if (!mounted) return;
@@ -1102,6 +1156,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showTimeSignatureDialog() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final composition = _engine.composition.value;
@@ -1180,6 +1235,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _showVolumeDialog() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final composition = _engine.composition.value;
@@ -1249,6 +1305,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _changeHistory({required bool redo}) async {
+    if (_resolvePhraseFirst()) return;
     if (_historyBusy) return;
     setState(() => _historyBusy = true);
     try {
@@ -1288,6 +1345,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     int pitchDelta = 0,
     int durationDelta = 0,
   }) async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final selectedTick = _engine.notationCursorTick.value;
@@ -1299,6 +1357,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _pausedByUser = true;
       await _pauseRecording();
     }
+    if (_resolvePhraseFirst()) return;
     _engine.notationCursorTick.value = selectedTick;
     final edited = _engine.editNoteAtTick(
       selectedTick,
@@ -1316,6 +1375,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _toggleSelectedRest({bool insertNote = false}) async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final selectedTick = _engine.notationCursorTick.value;
@@ -1327,6 +1387,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _pausedByUser = true;
       await _pauseRecording();
     }
+    if (_resolvePhraseFirst()) return;
     _engine.notationCursorTick.value = selectedTick;
     final edited = insertNote
         ? _engine.writeNoteAtTick(selectedTick)
@@ -1340,6 +1401,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _toggleSelectedTie() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final selectedTick = _engine.notationCursorTick.value;
@@ -1357,6 +1419,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _removeSelectedNote() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final selectedTick = _engine.notationCursorTick.value;
@@ -1373,6 +1436,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _insertMeasure() async {
+    if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final selectedTick = _engine.notationCursorTick.value;
@@ -1568,73 +1632,102 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               ),
             ),
             const SizedBox(height: 10),
-            Card(
-              clipBehavior: Clip.antiAlias,
-              child: SizedBox(
-                height: 350,
-                child: ValueListenableBuilder<Composition>(
-                  valueListenable: _engine.composition,
-                  builder: (context, composition, _) =>
-                      ValueListenableBuilder<int>(
-                        valueListenable: _engine.notationCursorTick,
-                        builder: (context, cursorTick, _) {
-                          final beginnerTest =
-                              _testActive &&
-                              _engine.settings.value.practiceDifficulty ==
-                                  PracticeDifficulty.beginner;
-                          final gaugeTarget = _practiceActive
-                              ? _practiceSession
-                                    ?.currentTarget
-                                    ?.soundingMidiPitch
-                              : beginnerTest
-                              ? _testSession?.expectedMidiPitchAtTick(
-                                  cursorTick,
-                                )
-                              : null;
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              PracticePitchGauge(
-                                active: _practiceActive || beginnerTest,
-                                targetMidiPitch: gaugeTarget,
-                                pitch: _engine.livePitch,
-                                microphoneStatus: _engine.microphoneStatus,
-                                settings: _engine.settings,
-                              ),
-                              Expanded(
-                                child: ScoreView(
-                                  composition: composition,
-                                  scrollController: _scoreScroll,
-                                  selectedEventIndex: _engine.eventIndexAtTick(
-                                    cursorTick,
-                                  ),
-                                  playbackPosition: ScoreLayout.durationAt(
-                                    cursorTick,
-                                    composition.tempoBpm,
-                                  ),
-                                  showPlaybackCursor: true,
-                                  practiceTargetTick:
-                                      _practiceSession?.currentTarget == null
-                                      ? null
-                                      : _practiceSession!.sourceTickAt(
-                                          _practiceSession!
-                                              .currentTarget!
-                                              .startTick,
+            ValueListenableBuilder<PhraseDraft?>(
+              valueListenable: _engine.phraseDraft,
+              builder: (context, draft, _) => Column(
+                children: [
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: SizedBox(
+                      height: 350,
+                      child: ValueListenableBuilder<Composition>(
+                        valueListenable: _engine.composition,
+                        builder: (context, composition, _) =>
+                            ValueListenableBuilder<int>(
+                              valueListenable: _engine.notationCursorTick,
+                              builder: (context, cursorTick, _) {
+                                final beginnerTest =
+                                    _testActive &&
+                                    _engine.settings.value.practiceDifficulty ==
+                                        PracticeDifficulty.beginner;
+                                final gaugeTarget = _practiceActive
+                                    ? _practiceSession
+                                          ?.currentTarget
+                                          ?.soundingMidiPitch
+                                    : beginnerTest
+                                    ? _testSession?.expectedMidiPitchAtTick(
+                                        cursorTick,
+                                      )
+                                    : null;
+                                return Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    PracticePitchGauge(
+                                      active: _practiceActive || beginnerTest,
+                                      targetMidiPitch: gaugeTarget,
+                                      pitch: _engine.livePitch,
+                                      microphoneStatus:
+                                          _engine.microphoneStatus,
+                                      settings: _engine.settings,
+                                    ),
+                                    Expanded(
+                                      child: ScoreView(
+                                        composition:
+                                            draft?.preview ?? composition,
+                                        pitchTrace: draft?.trace ?? const [],
+                                        previewStartTick:
+                                            draft?.stage == PhraseStage.review
+                                            ? draft?.startTick
+                                            : null,
+                                        previewEndTick:
+                                            draft?.stage == PhraseStage.review
+                                            ? draft?.endTick
+                                            : null,
+                                        scrollController: _scoreScroll,
+                                        selectedTick: cursorTick,
+                                        selectedEventIndex: _engine
+                                            .eventIndexAtTick(cursorTick),
+                                        playbackPosition:
+                                            ScoreLayout.durationAt(
+                                              cursorTick,
+                                              composition.tempoBpm,
+                                            ),
+                                        showPlaybackCursor: true,
+                                        practiceTargetTick:
+                                            _practiceSession?.currentTarget ==
+                                                null
+                                            ? null
+                                            : _practiceSession!.sourceTickAt(
+                                                _practiceSession!
+                                                    .currentTarget!
+                                                    .startTick,
+                                              ),
+                                        practiceProgress: _practiceProgress,
+                                        cursorFollowFraction: _engine
+                                            .settings
+                                            .value
+                                            .cursorFollowFraction,
+                                        onCursorMoved: (position) => unawaited(
+                                          _movePlaybackCursor(position),
                                         ),
-                                  practiceProgress: _practiceProgress,
-                                  cursorFollowFraction: _engine
-                                      .settings
-                                      .value
-                                      .cursorFollowFraction,
-                                  onCursorMoved: (position) =>
-                                      unawaited(_movePlaybackCursor(position)),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                       ),
-                ),
+                    ),
+                  ),
+                  if (draft != null)
+                    PhraseReviewPanel(
+                      draft: draft,
+                      onAccept: () => _engine.acceptPhrase(),
+                      onDiscard: _engine.discardPhrase,
+                      onFinish: () => unawaited(_engine.finishPhrase()),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -1758,8 +1851,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                     valueListenable: _engine.settings,
                     builder: (context, value, _) => VoiceSettingsPanel(
                       value: value,
-                      onChanged: (next) =>
-                          unawaited(_engine.updateSettings(next)),
+                      onChanged: (next) {
+                        if (!_resolvePhraseFirst()) {
+                          unawaited(_engine.updateSettings(next));
+                        }
+                      },
                     ),
                   ),
                 ],
@@ -1778,6 +1874,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.notationCursorTick.removeListener(_notationCursorChanged);
     _engine.microphoneStatus.removeListener(_microphoneStatusChanged);
     _engine.latestAudioFrame.removeListener(_practiceFrameChanged);
+    _engine.phraseDraft.removeListener(_phraseChanged);
     _playback.position.removeListener(_playbackPositionChanged);
     _playback.isPlaying.removeListener(_transportWakeStateChanged);
     _scoreScroll.dispose();
@@ -2166,10 +2263,7 @@ class _CompositionHeader extends StatelessWidget {
     spacing: 8,
     runSpacing: 6,
     children: [
-      _chip(
-        Icons.music_note,
-        composition.clef == ClefType.treble ? 'Treble clef' : 'Bass clef',
-      ),
+      _chip(Icons.music_note, '${composition.clef.label} clef'),
       ActionChip(
         avatar: const Icon(Icons.swap_vert, size: 16),
         label: Text(composition.octaveRange.label),

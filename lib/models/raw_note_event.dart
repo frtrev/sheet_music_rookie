@@ -27,6 +27,7 @@ class RawNoteEvent {
   int get durationMs => endTimeMs - startTimeMs;
 
   RawNoteEvent copyWith({
+    List<NoteLyric>? lyrics,
     int? endTimeMs,
     double? frequencyHz,
     double? confidence,
@@ -36,7 +37,7 @@ class RawNoteEvent {
     bool? tieToNext,
   }) {
     return RawNoteEvent(
-      lyrics: lyrics,
+      lyrics: lyrics ?? this.lyrics,
       startTimeMs: startTimeMs,
       endTimeMs: endTimeMs ?? this.endTimeMs,
       frequencyHz: frequencyHz ?? this.frequencyHz,

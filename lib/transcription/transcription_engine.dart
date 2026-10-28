@@ -6,6 +6,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 
 import '../audio/microphone_service.dart';
+import '../audio/phrase_analyzer.dart';
+import '../models/phrase_draft.dart';
 import '../audio/note_segmenter.dart';
 import '../audio/pitch_detector.dart';
 import '../audio/pitch_smoother.dart';
@@ -44,6 +46,190 @@ class TranscriptionEngine {
              Composition(clef: clef, octaveRange: octaveRange),
        ) {
     _savedSnapshot = _snapshot();
+  }
+
+  final ValueNotifier<PhraseDraft?> phraseDraft = ValueNotifier(null);
+  final List<AudioFrame> _phraseFrames = [];
+  final List<PitchTracePoint> _phraseTrace = [];
+  int? _phraseOrigin;
+  int? _phraseSilenceStart;
+  int _phraseStartTick = 0;
+  int _phraseGeneration = 0;
+  int _lastTraceTimestamp = 0;
+  bool _disposed = false;
+  bool get _phraseMode =>
+      settings.value.recordingAnalysisMode == RecordingAnalysisMode.phrase;
+
+  void discardPhrase() {
+    _phraseGeneration++;
+    _phraseFrames.clear();
+    _phraseTrace.clear();
+    _phraseOrigin = null;
+    _phraseSilenceStart = null;
+    if (!_disposed) phraseDraft.value = null;
+  }
+
+  bool acceptPhrase() {
+    final draft = phraseDraft.value;
+    if (draft == null ||
+        draft.stage != PhraseStage.review ||
+        draft.events.isEmpty) {
+      return false;
+    }
+    discardPhrase();
+    _edit(() => _overwriteFromTick(draft.startTick, draft.events));
+    return true;
+  }
+
+  Composition? _traceBase;
+  Composition? _tracePreview;
+  Composition _traceComposition(int endTick) {
+    final score = composition.value;
+    if (identical(_traceBase, score) &&
+        _tracePreview != null &&
+        _tracePreview!.editableEndTick > endTick) {
+      return _tracePreview!;
+    }
+    _traceBase = score;
+    final measures = [...score.measures];
+    var capacity = score.editableEndTick;
+    if (measures.isEmpty) {
+      measures.add(const Measure(index: 0, notes: []));
+    }
+    while (capacity <= endTick) {
+      final index = measures.length;
+      measures.add(
+        Measure(
+          index: index,
+          notes: const [],
+          beatsPerMeasure: measures.last.effectiveBeats(score.beatsPerMeasure),
+          beatUnit: measures.last.effectiveBeatUnit(score.beatUnit),
+        ),
+      );
+      capacity += score.measureCapacityTicks(index - 1);
+    }
+    return _tracePreview = score.copyWith(measures: measures);
+  }
+
+  void _capturePhraseFrame(AudioFrame frame, PitchDetectionResult? pitch) {
+    final stage = phraseDraft.value?.stage;
+    if (stage != null && stage != PhraseStage.recording) return;
+    var sum = 0.0;
+    for (final sample in frame.samples) {
+      sum += sample * sample;
+    }
+    final rms = math.sqrt(sum / frame.samples.length);
+    final audible = rms > math.pow(10, settings.value.silenceThresholdDb / 20);
+    if (_phraseOrigin == null) {
+      if (!audible) return;
+      _phraseOrigin = frame.timestampMs;
+      _phraseStartTick = notationCursorTick.value.clamp(
+        0,
+        _totalTicks(rawEvents),
+      );
+      _lastTraceTimestamp = frame.timestampMs - 100;
+    }
+    _phraseFrames.add(frame);
+    if (audible) {
+      _phraseSilenceStart = null;
+    } else {
+      _phraseSilenceStart ??= frame.timestampMs;
+    }
+    final elapsed = frame.timestampMs - _phraseOrigin!;
+    if (frame.timestampMs - _lastTraceTimestamp >= 65) {
+      _lastTraceTimestamp = frame.timestampMs;
+      final midi =
+          pitch != null &&
+              pitch.confidence >= settings.value.minimumConfidence &&
+              audible
+          ? 69 + 12 * math.log(pitch.frequencyHz / 440) / math.ln2
+          : null;
+      _phraseTrace.add(
+        PitchTracePoint(
+          _phraseStartTick +
+              (elapsed * composition.value.tempoBpm * 480 / 60000).round(),
+          midi,
+        ),
+      );
+      phraseDraft.value = PhraseDraft(
+        stage: PhraseStage.recording,
+        startTick: _phraseStartTick,
+        trace: List.unmodifiable(_phraseTrace),
+        preview: _traceComposition(_phraseTrace.last.tick),
+      );
+    }
+    if ((_phraseSilenceStart != null &&
+            frame.timestampMs - _phraseSilenceStart! >=
+                settings.value.phraseSilenceMs) ||
+        elapsed >= 30000) {
+      unawaited(finishPhrase());
+    }
+  }
+
+  Future<void> finishPhrase() async {
+    if (_phraseFrames.isEmpty ||
+        phraseDraft.value?.stage != PhraseStage.recording) {
+      return;
+    }
+    final generation = ++_phraseGeneration;
+    final start = _phraseStartTick;
+    final trace = List<PitchTracePoint>.unmodifiable(_phraseTrace);
+    final request = PhraseAnalysisRequest(
+      List.of(_phraseFrames),
+      settings.value,
+      composition.value.tempoBpm,
+    );
+    _phraseFrames.clear();
+    _phraseOrigin = null;
+    _phraseSilenceStart = null;
+    phraseDraft.value = PhraseDraft(
+      stage: PhraseStage.analyzing,
+      startTick: start,
+      trace: trace,
+      preview: _traceComposition(trace.isEmpty ? start : trace.last.tick),
+    );
+    try {
+      final events = await compute(analyzePhrase, request);
+      if (_disposed || generation != _phraseGeneration) return;
+      if (events.isEmpty) {
+        phraseDraft.value = PhraseDraft(
+          stage: PhraseStage.failed,
+          startTick: start,
+          trace: trace,
+          message: 'No clear notes found. Try again or adjust the detection settings.',
+        );
+        return;
+      }
+      final previewEvents = _spliceEvents(rawEvents, start, events);
+      final preview = composition.value.copyWith(
+        measures: _measureBuilder.build(
+          previewEvents,
+          composition.value.tempoBpm,
+          composition.value.beatsPerMeasure,
+          beatUnit: composition.value.beatUnit,
+          octaveTranspositionSemitones: composition.value.octaveRange.semitones,
+          keySignature: composition.value.keySignature,
+          measureTemplates: composition.value.measures,
+        ),
+      );
+      phraseDraft.value = PhraseDraft(
+        stage: PhraseStage.review,
+        startTick: start,
+        endTick: start + _totalTicks(events),
+        events: List.unmodifiable(events),
+        preview: preview,
+        trace: trace,
+      );
+    } catch (_) {
+      if (!_disposed && generation == _phraseGeneration) {
+        phraseDraft.value = PhraseDraft(
+          stage: PhraseStage.failed,
+          startTick: start,
+          trace: trace,
+          message: 'Could not analyze this phrase. Discard it and try again.',
+        );
+      }
+    }
   }
 
   final MicrophoneService _microphone;
@@ -96,6 +282,7 @@ class TranscriptionEngine {
   }
 
   bool get hasUnsavedChanges =>
+      phraseDraft.value != null ||
       _recordingBefore != null ||
       !_sameContent(
         _dirtySnapshot(_savedSnapshot),
@@ -189,6 +376,7 @@ class TranscriptionEngine {
   }
 
   T _edit<T>(T Function() action) {
+    if (phraseDraft.value != null) discardPhrase();
     if (isPunchingIn) _finishPunchIn();
     final before = _snapshot();
     final result = action();
@@ -203,6 +391,7 @@ class TranscriptionEngine {
   }
 
   void _restore(_ScoreSnapshot snapshot) {
+    discardPhrase();
     final current = composition.value;
     _segmenter.reset();
     _smoother.clear();
@@ -288,10 +477,15 @@ class TranscriptionEngine {
   ) => _edit(() {
     final index = eventIndexAtTick(tick);
     if (index != null && !rawEvents[index].isRest) {
-      final (start, end) = _tiedGroupBounds(index);
+      var position = _totalTicks(rawEvents.sublist(0, index));
+      final fragment = _notationFragments(index).firstWhere((note) {
+        final contains = tick < position + note.durationTicks;
+        position += note.durationTicks;
+        return contains;
+      });
       return (
-        midiPitch: rawEvents[start].midiPitch,
-        durationTicks: _totalTicks(rawEvents.sublist(start, end + 1)),
+        midiPitch: rawEvents[index].midiPitch,
+        durationTicks: fragment.durationTicks,
         isRest: false,
       );
     }
@@ -353,13 +547,14 @@ class TranscriptionEngine {
 
   void setCaptureEnabled(bool enabled) {
     if (_captureEnabled == enabled) return;
+    if (!enabled && _phraseMode) unawaited(finishPhrase());
     _captureEnabled = enabled;
     _segmenter.reset();
     _smoother.clear();
     _lastRenderedActiveTicks = 0;
     currentNoteDurationMs.value = 0;
     if (!enabled && isPunchingIn) _finishPunchIn();
-    _rebuildComposition();
+    if (!_phraseMode) _rebuildComposition();
   }
 
   Future<void> initialize({bool autoStart = false}) async {
@@ -385,16 +580,19 @@ class TranscriptionEngine {
   }
 
   Future<void> pauseListening() async {
-    final completed = _segmenter.finish(
-      livePitch.value?.timestampMs ?? 0,
-      settings.value,
-    );
-    if (completed != null && _captureEnabled) {
-      _commitFinalized(completed, endPunchIn: isPunchingIn);
-    } else if (_captureEnabled && isPunchingIn) {
-      _finishPunchIn();
+    if (_phraseMode) await finishPhrase();
+    if (!_phraseMode) {
+      final completed = _segmenter.finish(
+        livePitch.value?.timestampMs ?? 0,
+        settings.value,
+      );
+      if (completed != null && _captureEnabled) {
+        _commitFinalized(completed, endPunchIn: isPunchingIn);
+      } else if (_captureEnabled && isPunchingIn) {
+        _finishPunchIn();
+      }
+      _rebuildComposition();
     }
-    _rebuildComposition();
     await _subscription?.cancel();
     _subscription = null;
     await _microphone.stop();
@@ -426,6 +624,11 @@ class TranscriptionEngine {
       microphoneStatus.value = isVoice
           ? MicrophoneStatus.voiceDetected
           : MicrophoneStatus.silence;
+      if (_phraseMode) {
+        if (_captureEnabled) _capturePhraseFrame(frame, detected);
+        latestAudioFrame.value = frame;
+        return;
+      }
       final update = _segmenter.process(
         smoothed,
         frame.timestampMs,
@@ -500,6 +703,11 @@ class TranscriptionEngine {
   }
 
   void beginPunchInAt(int tick) {
+    if (_phraseMode) {
+      if (phraseDraft.value != null) return;
+      notationCursorTick.value = tick.clamp(0, _totalTicks(rawEvents));
+      return;
+    }
     // Moving the cursor while recording commits any completed notes from the
     // previous punch-in. The active, unfinished sound is intentionally reset
     // so it cannot leak into the newly selected note.
@@ -558,20 +766,95 @@ class TranscriptionEngine {
     return index != null && rawEvents[index].isRest;
   }
 
+  Composition? _fragmentScore;
+  int _fragmentEventCount = -1;
+  final Map<int, List<MusicalNote>> _fragmentsBySource = {};
+
+  List<MusicalNote> _notationFragments(int index) {
+    if (!identical(_fragmentScore, composition.value) ||
+        _fragmentEventCount != rawEvents.length) {
+      _fragmentScore = composition.value;
+      _fragmentEventCount = rawEvents.length;
+      _fragmentsBySource.clear();
+      final measures = _measureBuilder.build(
+        rawEvents,
+        composition.value.tempoBpm,
+        composition.value.beatsPerMeasure,
+        beatUnit: composition.value.beatUnit,
+        measureTemplates: composition.value.measures,
+      );
+      for (final note in measures.expand((measure) => measure.notes)) {
+        (_fragmentsBySource[note.sourceEventIndex] ??= []).add(note);
+      }
+    }
+    return _fragmentsBySource[index] ?? const [];
+  }
+
+  // Materialize the displayed fragments only when an edit needs independent
+  // events. This remains inside the edit's undo snapshot.
+  void _splitSelectedEvent(int tick) {
+    final index = eventIndexAtTick(tick);
+    if (index == null) return;
+    final fragments = _notationFragments(index);
+    if (fragments.length < 2) return;
+    final original = rawEvents[index];
+    final pieces = <({RawNoteEvent event, int ticks})>[];
+    for (final (i, event) in rawEvents.indexed) {
+      if (i != index) {
+        pieces.add((event: event, ticks: _ticksFor(event)));
+        continue;
+      }
+      for (final (part, fragment) in fragments.indexed) {
+        pieces.add((
+          event: original.copyWith(
+            lyrics: part == 0 ? original.lyrics : const [],
+            accidental: part == 0 ? original.accidental : NoteAccidental.none,
+            tieToNext:
+                !original.isRest &&
+                (part + 1 < fragments.length || original.tieToNext),
+          ),
+          ticks: fragment.durationTicks,
+        ));
+      }
+    }
+    _replaceWithPieces(pieces);
+    _rebuildComposition();
+  }
+
+  void _detachIncomingTie(int index) {
+    if (index > 0 && rawEvents[index - 1].tieToNext) {
+      rawEvents[index - 1] = rawEvents[index - 1].copyWith(tieToNext: false);
+    }
+  }
+
   bool canToggleTieAtTick(int tick) {
     final index = eventIndexAtTick(tick);
-    return index != null &&
-        index + 1 < rawEvents.length &&
-        !rawEvents[index].isRest &&
-        !rawEvents[index + 1].isRest;
+    if (index == null || rawEvents[index].isRest) return false;
+    var position = _totalTicks(rawEvents.sublist(0, index));
+    final fragments = _notationFragments(index);
+    for (final (i, fragment) in fragments.indexed) {
+      if (tick < position + fragment.durationTicks) {
+        return i + 1 < fragments.length ||
+            (index + 1 < rawEvents.length && !rawEvents[index + 1].isRest);
+      }
+      position += fragment.durationTicks;
+    }
+    return false;
   }
 
   bool isTiedAtTick(int tick) {
     final index = eventIndexAtTick(tick);
-    return index != null && rawEvents[index].tieToNext;
+    if (index == null) return false;
+    var position = _totalTicks(rawEvents.sublist(0, index));
+    for (final fragment in _notationFragments(index)) {
+      if (tick < position + fragment.durationTicks) return fragment.tieToNext;
+      position += fragment.durationTicks;
+    }
+    return false;
   }
 
   bool? _toggleTieAtTick(int tick) {
+    _splitSelectedEvent(tick);
     final index = eventIndexAtTick(tick);
     if (index == null) return null;
     final original = rawEvents[index];
@@ -581,8 +864,16 @@ class TranscriptionEngine {
       return false;
     }
     if (!canToggleTieAtTick(tick)) return null;
+    _splitSelectedEvent(_totalTicks(rawEvents.sublist(0, index + 1)));
     rawEvents[index] = original.copyWith(tieToNext: true);
-    _normalizeTiedGroupPitch(index);
+    final source = rawEvents[index];
+    final next = rawEvents[index + 1];
+    rawEvents[index + 1] = next.copyWith(
+      midiPitch: source.midiPitch,
+      frequencyHz: source.frequencyHz,
+      accidental: NoteAccidental.none,
+      tieToNext: next.midiPitch == source.midiPitch && next.tieToNext,
+    );
     _rebuildComposition();
     return true;
   }
@@ -591,7 +882,10 @@ class TranscriptionEngine {
     if (isPunchingIn) _finishPunchIn();
     final index = eventIndexAtTick(tick);
     if (index == null) return false;
-    final (groupStart, groupEnd) = _tiedGroupBounds(index);
+    _splitSelectedEvent(tick);
+    final groupStart = eventIndexAtTick(tick)!;
+    final groupEnd = groupStart;
+    _detachIncomingTie(groupStart);
     final startTick = _totalTicks(rawEvents.sublist(0, groupStart));
     rawEvents.removeRange(groupStart, groupEnd + 1);
     notationCursorTick.value = startTick.clamp(0, _totalTicks(rawEvents));
@@ -743,30 +1037,6 @@ class TranscriptionEngine {
     }
   }
 
-  void _normalizeTiedGroupPitch(int index) {
-    final (start, end) = _tiedGroupBounds(index);
-    final source = rawEvents[start];
-    for (var current = start + 1; current <= end; current++) {
-      rawEvents[current] = rawEvents[current].copyWith(
-        midiPitch: source.midiPitch,
-        frequencyHz: source.frequencyHz,
-        accidental: NoteAccidental.none,
-      );
-    }
-  }
-
-  (int, int) _tiedGroupBounds(int index) {
-    var start = index;
-    while (start > 0 && rawEvents[start - 1].tieToNext) {
-      start--;
-    }
-    var end = index;
-    while (end + 1 < rawEvents.length && rawEvents[end].tieToNext) {
-      end++;
-    }
-    return (start, end);
-  }
-
   bool canToggleRestAtTick(int tick) {
     if (eventIndexAtTick(tick) != null) return true;
     final totalTicks = _totalTicks(rawEvents);
@@ -777,14 +1047,13 @@ class TranscriptionEngine {
   ({int midiPitch, int durationTicks, bool isRest})? _toggleRestAtTick(
     int tick,
   ) {
+    _splitSelectedEvent(tick);
     final eventIndex = eventIndexAtTick(tick);
     if (eventIndex != null) {
       final original = rawEvents[eventIndex];
       final durationTicks = _ticksFor(original);
       if (original.isRest) {
-        final writtenFirstLine = composition.value.clef == ClefType.treble
-            ? 64 // E4
-            : 43; // G2
+        final writtenFirstLine = composition.value.clef.bottomLineMidi;
         final soundingMidi =
             (writtenFirstLine + composition.value.octaveRange.semitones)
                 .clamp(0, 127)
@@ -885,10 +1154,13 @@ class TranscriptionEngine {
     final eventIndex = eventIndexAtTick(tick);
     if (eventIndex == null) return null;
 
-    final (groupStart, groupEnd) = _tiedGroupBounds(eventIndex);
-    final original = rawEvents[eventIndex];
+    _splitSelectedEvent(tick);
+    final selectedIndex = eventIndexAtTick(tick)!;
+    final groupStart = selectedIndex;
+    final groupEnd = selectedIndex;
+    final original = rawEvents[selectedIndex];
     if (original.isRest && pitchDelta != 0) return null;
-    final durationEventIndex = groupStart == groupEnd ? eventIndex : groupEnd;
+    final durationEventIndex = selectedIndex;
     final durationEvent = rawEvents[durationEventIndex];
     final originalTicks = _ticksFor(durationEvent);
     final originalValueIndex = NoteValue.values.indexWhere(
@@ -897,12 +1169,7 @@ class TranscriptionEngine {
     final nextValueIndex = (originalValueIndex + durationDelta)
         .clamp(0, NoteValue.values.length - 1)
         .toInt();
-    final nextValue = durationDelta < 0
-        ? NoteValue.values.reversed.firstWhere(
-            (value) => value.ticks <= originalTicks / 2,
-            orElse: () => NoteValue.sixteenth,
-          )
-        : NoteValue.values[nextValueIndex];
+    final nextValue = NoteValue.values[nextValueIndex];
     final groupPitch = rawEvents[groupStart].midiPitch;
     final nextMidi = (groupPitch + pitchDelta).clamp(0, 127).toInt();
     final isBlackKey = const {1, 3, 6, 8, 10}.contains(nextMidi % 12);
@@ -926,6 +1193,12 @@ class TranscriptionEngine {
         : NoteAccidental.automatic;
     final frequency = 440 * math.pow(2, (nextMidi - 69) / 12);
 
+    if (pitchDelta != 0 || nextValue.ticks < originalTicks) {
+      rawEvents[selectedIndex] = rawEvents[selectedIndex].copyWith(
+        tieToNext: false,
+      );
+      if (pitchDelta != 0) _detachIncomingTie(selectedIndex);
+    }
     for (var index = groupStart; index <= groupEnd; index++) {
       final event = rawEvents[index];
       final editedTicks = index == durationEventIndex
@@ -1093,6 +1366,11 @@ class TranscriptionEngine {
   }
 
   Future<void> updateSettings(VoiceDetectionSettings value) async {
+    if (value.recordingAnalysisMode != settings.value.recordingAnalysisMode) {
+      discardPhrase();
+      _segmenter.reset();
+      _smoother.clear();
+    }
     settings.value = value;
     await _settingsService.save(value);
   }
@@ -1152,6 +1430,8 @@ class TranscriptionEngine {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
+    discardPhrase();
     await _subscription?.cancel();
     await _microphone.dispose();
     microphoneStatus.dispose();
@@ -1162,5 +1442,6 @@ class TranscriptionEngine {
     notationCursorTick.dispose();
     composition.dispose();
     historyRevision.dispose();
+    phraseDraft.dispose();
   }
 }

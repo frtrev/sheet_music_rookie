@@ -40,6 +40,80 @@ class FakeMicrophoneService implements MicrophoneService {
 }
 
 void main() {
+  test(
+    'tie endpoints follow the connected note within and across measures',
+    () {
+      const first = MusicalNote(
+        midiPitch: 60,
+        startTick: 0,
+        durationTicks: 960,
+        tieToNext: true,
+      );
+      const second = MusicalNote(
+        midiPitch: 60,
+        startTick: 960,
+        durationTicks: 960,
+        tieFromPrevious: true,
+        tieToNext: true,
+      );
+      const third = MusicalNote(
+        midiPitch: 60,
+        startTick: 0,
+        durationTicks: 480,
+        tieFromPrevious: true,
+      );
+      const score = Composition(
+        clef: ClefType.treble,
+        measures: [
+          Measure(index: 0, notes: [first, second]),
+          Measure(index: 1, notes: [third]),
+        ],
+      );
+      expect(
+        ScoreLayout.tieTarget(score, 0, first),
+        ScoreLayout.noteCenter(score, 0, second),
+      );
+      expect(
+        ScoreLayout.tieTarget(score, 0, second),
+        ScoreLayout.noteCenter(score, 1, third),
+      );
+      expect(ScoreLayout.tieTarget(score, 1, third), isNull);
+    },
+  );
+
+  test('dangling ties do not draw toward an unrelated note or rest', () {
+    const first = MusicalNote(
+      midiPitch: 60,
+      startTick: 0,
+      durationTicks: 480,
+      tieToNext: true,
+    );
+    for (final next in [
+      const MusicalNote(
+        midiPitch: 62,
+        startTick: 480,
+        durationTicks: 480,
+        tieFromPrevious: true,
+      ),
+      const MusicalNote(midiPitch: 60, startTick: 480, durationTicks: 480),
+      const MusicalNote(
+        midiPitch: 60,
+        startTick: 480,
+        durationTicks: 480,
+        tieFromPrevious: true,
+        isRest: true,
+      ),
+    ]) {
+      final score = Composition(
+        clef: ClefType.treble,
+        measures: [
+          Measure(index: 0, notes: [first, next]),
+        ],
+      );
+      expect(ScoreLayout.tieTarget(score, 0, first), isNull);
+    }
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues({});
 
@@ -551,7 +625,70 @@ void main() {
     );
   });
 
-  test('tied notes edit and preview as one sustained group', () {
+  test('barline fragments untie independently with undo and redo', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [
+      rawEvent(55, 500),
+      rawEvent(60, 2000),
+      rawEvent(64, 500),
+    ]);
+    expect(engine.isTiedAtTick(480), isTrue);
+    expect(engine.toggleTieAtTick(480), isFalse);
+    expect(engine.rawEvents.map((e) => e.durationMs), [500, 1500, 500, 500]);
+    expect(engine.rawEvents[1].tieToNext, isFalse);
+    engine.undo();
+    expect(engine.rawEvents.length, 3);
+    expect(engine.isTiedAtTick(480), isTrue);
+    engine.redo();
+    expect(engine.rawEvents.length, 4);
+    expect(engine.toggleTieAtTick(1920), isTrue);
+    final edited = engine.editNoteAtTick(1920, durationDelta: -1);
+    expect(edited?.durationTicks, 360);
+    expect(engine.rawEvents[1].durationMs, 1500);
+    expect(engine.rawEvents.last.durationMs, 500);
+    expect(engine.rawEvents.last.startTimeMs, 2500);
+    expect(engine.rawEvents[2].tieToNext, isFalse);
+  });
+
+  test('editing a continuation changes only that displayed fragment', () {
+    final engine = TranscriptionEngine(
+      clef: ClefType.treble,
+      octaveRange: OctaveRange.standard,
+      microphone: FakeMicrophoneService(),
+    );
+    engine.overwriteFromTick(0, [rawEvent(55, 500), rawEvent(60, 2000)]);
+    expect(engine.canToggleTieAtTick(1920), isFalse);
+    final result = engine.editNoteAtTick(1920, pitchDelta: 2);
+    expect(result, (midiPitch: 62, durationTicks: 480));
+    expect(engine.rawEvents.map((e) => e.midiPitch), [55, 60, 62]);
+    expect(engine.rawEvents[1].tieToNext, isFalse);
+  });
+
+  test(
+    'tying into a barline-crossing note changes only its first fragment',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+      );
+      engine.overwriteFromTick(0, [rawEvent(55, 500), rawEvent(60, 2000)]);
+      expect(engine.toggleTieAtTick(0), isTrue);
+      expect(engine.rawEvents.map((e) => e.midiPitch), [55, 55, 60]);
+      expect(engine.rawEvents.first.tieToNext, isTrue);
+      expect(engine.rawEvents[1].tieToNext, isFalse);
+      engine.editNoteAtTick(480, durationDelta: -1);
+      expect(engine.rawEvents.first.durationMs, 500);
+      expect(engine.rawEvents.last.startTimeMs, 2000);
+      expect(engine.rawEvents.last.midiPitch, 60);
+    },
+  );
+
+  test('tied notes edit independently and detach ties on pitch change', () {
     final engine = TranscriptionEngine(
       clef: ClefType.treble,
       octaveRange: OctaveRange.standard,
@@ -562,17 +699,17 @@ void main() {
 
     expect(engine.rawEvents.map((event) => event.midiPitch), [60, 60]);
     final raised = engine.editNoteAtTick(0, pitchDelta: 1);
-    expect(engine.rawEvents.map((event) => event.midiPitch), [61, 61]);
-    expect(raised, (midiPitch: 61, durationTicks: 960));
+    expect(engine.rawEvents.map((event) => event.midiPitch), [61, 60]);
+    expect(raised, (midiPitch: 61, durationTicks: 480));
 
     final lengthened = engine.editNoteAtTick(0, durationDelta: 1);
-    expect(engine.rawEvents.map((event) => event.durationMs), [500, 750]);
-    expect(lengthened, (midiPitch: 61, durationTicks: 1200));
-    expect(engine.rawEvents.first.tieToNext, isTrue);
+    expect(engine.rawEvents.map((event) => event.durationMs), [750, 500]);
+    expect(lengthened, (midiPitch: 61, durationTicks: 720));
+    expect(engine.rawEvents.first.tieToNext, isFalse);
   });
 
   test(
-    'shortening a quarter in 2/4 leaves an eighth rest before the next note',
+    'shortening a quarter in 2/4 leaves a sixteenth rest before the next note',
     () {
       final engine = TranscriptionEngine(
         clef: ClefType.treble,
@@ -586,11 +723,11 @@ void main() {
       engine.overwriteFromTick(0, [rawEvent(60, 500), rawEvent(64, 500)]);
       engine.notationCursorTick.value = 0;
       final result = engine.editNoteAtTick(0, durationDelta: -1);
-      expect(result, (midiPitch: 60, durationTicks: 240));
+      expect(result, (midiPitch: 60, durationTicks: 360));
       final notes = engine.composition.value.measures.first.notes;
-      expect(notes.map((n) => n.durationTicks), [240, 240, 480]);
+      expect(notes.map((n) => n.durationTicks), [360, 120, 480]);
       expect(notes.map((n) => n.isRest), [false, true, false]);
-      expect(notes.map((n) => n.startTick), [0, 240, 480]);
+      expect(notes.map((n) => n.startTick), [0, 360, 480]);
       expect(engine.rawEvents.last.startTimeMs, 500);
       engine.undo();
       expect(engine.rawEvents.length, 2);
@@ -598,13 +735,40 @@ void main() {
       expect(engine.rawEvents.length, 3);
       expect(engine.composition.value.measures.first.notes.last.startTick, 480);
       engine.editNoteAtTick(0, durationDelta: 1);
-      expect(engine.rawEvents.map((e) => e.isRest), [false, true, false]);
-      expect(engine.composition.value.measures.first.notes.last.startTick, 480);
-      engine.editNoteAtTick(0, durationDelta: 1);
       expect(engine.rawEvents.length, 2);
       expect(engine.rawEvents.last.startTimeMs, 500);
     },
   );
+
+  test('duration arrows traverse adjacent values in both directions', () {
+    for (var index = 0; index < NoteValue.values.length; index++) {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+      );
+      final ticks = NoteValue.values[index].ticks;
+      final milliseconds = (ticks * 500 / 480).round();
+      engine.overwriteFromTick(0, [
+        rawEvent(60, milliseconds),
+        rawEvent(64, 500),
+      ]);
+      final shorter = engine.editNoteAtTick(0, durationDelta: -1);
+      expect(
+        shorter?.durationTicks,
+        NoteValue.values[index == 0 ? 0 : index - 1].ticks,
+      );
+      expect(engine.rawEvents.last.startTimeMs, milliseconds);
+      if (index > 0) {
+        expect(
+          engine.editNoteAtTick(0, durationDelta: 1)?.durationTicks,
+          ticks,
+        );
+        expect(engine.rawEvents.length, 2);
+        expect(engine.rawEvents.last.startTimeMs, milliseconds);
+      }
+    }
+  });
 
   test('repeated shortening keeps the following note and bar in place', () {
     final engine = TranscriptionEngine(
@@ -620,7 +784,7 @@ void main() {
     expect(engine.rawEvents.last.startTimeMs, 2000);
     expect(
       engine.composition.value.measures.first.notes.first.durationTicks,
-      480,
+      960,
     );
   });
 
@@ -685,7 +849,7 @@ void main() {
     expect(engine.toggleTieAtTick(0), isNull);
   });
 
-  test('removing a selected tied note removes its complete musical group', () {
+  test('removing a selected tied note retains the other notes', () {
     final engine = TranscriptionEngine(
       clef: ClefType.treble,
       octaveRange: OctaveRange.standard,
@@ -699,8 +863,9 @@ void main() {
     engine.toggleTieAtTick(0);
 
     expect(engine.removeNoteAtTick(480), isTrue);
-    expect(engine.rawEvents.map((event) => event.midiPitch), [64]);
-    expect(engine.notationCursorTick.value, 0);
+    expect(engine.rawEvents.map((event) => event.midiPitch), [60, 64]);
+    expect(engine.notationCursorTick.value, 480);
+    expect(engine.rawEvents.first.tieToNext, isFalse);
     expect(engine.removeNoteAtTick(960), isFalse);
   });
 

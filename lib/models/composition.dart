@@ -1,7 +1,27 @@
 import 'playback_instrument.dart';
 import 'measure.dart';
 
-enum ClefType { treble, bass }
+enum ClefType {
+  treble('Treble', '𝄞', 'G', 2, 30, 64),
+  bass('Bass', '𝄢', 'F', 4, 18, 43),
+  alto('Alto', '𝄡', 'C', 3, 24, 53),
+  tenor('Tenor', '𝄡', 'C', 4, 22, 50);
+
+  const ClefType(
+    this.label,
+    this.symbol,
+    this.musicXmlSign,
+    this.musicXmlLine,
+    this.bottomLineDiatonic,
+    this.bottomLineMidi,
+  );
+  final String label;
+  final String symbol;
+  final String musicXmlSign;
+  final int musicXmlLine;
+  final int bottomLineDiatonic;
+  final int bottomLineMidi;
+}
 
 enum OctaveRange {
   twoOctavesDown(-24, '15 down', '15mb'),

@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sheet_music_rookie/models/composition.dart';
 import 'package:sheet_music_rookie/models/note_lyric.dart';
+import 'package:sheet_music_rookie/models/measure.dart';
+import 'package:sheet_music_rookie/models/musical_note.dart';
 import 'package:sheet_music_rookie/models/raw_note_event.dart';
 import 'package:sheet_music_rookie/notation/score_renderer.dart';
 import 'package:sheet_music_rookie/services/composition_storage_service.dart';
@@ -248,6 +250,64 @@ void main() {
       previous = x;
     }
   });
+
+  test('long lyrics use the measure space instead of the left note margin', () {
+    final lyric = NoteLyric(
+      '<lyric number="1"><text>A whole phrase that fits across the measure</text></lyric>',
+    );
+    final score = Composition(
+      clef: ClefType.treble,
+      measures: [
+        Measure(
+          index: 0,
+          notes: [
+            MusicalNote(
+              midiPitch: 60,
+              startTick: 0,
+              durationTicks: 1920,
+              lyrics: [lyric],
+            ),
+          ],
+        ),
+      ],
+    );
+    final bounds = ScoreLayout.lyricBounds(score, 0, 0);
+    final text = TextPainter(
+      text: TextSpan(text: lyric.text, style: const TextStyle(fontSize: 14)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    expect(bounds.width, greaterThanOrEqualTo(text.width));
+    expect(bounds.right, ScoreLayout.measureLeft(score, 1) - 4);
+    expect(bounds.left, greaterThan(ScoreLayout.measureLeft(score, 0)));
+  });
+
+  test(
+    'lyric space stops before the next note even without its own lyrics',
+    () {
+      const score = Composition(
+        clef: ClefType.treble,
+        measures: [
+          Measure(
+            index: 0,
+            notes: [
+              MusicalNote(midiPitch: 60, startTick: 0, durationTicks: 960),
+              MusicalNote(midiPitch: 64, startTick: 960, durationTicks: 960),
+            ],
+          ),
+        ],
+      );
+      final first = ScoreLayout.lyricBounds(score, 0, 0);
+      final second = ScoreLayout.lyricBounds(score, 0, 1);
+      expect(first.right, lessThan(second.left));
+      expect(
+        first.right,
+        lessThan(
+          ScoreLayout.noteCenter(score, 0, score.measures.first.notes[1]).dx,
+        ),
+      );
+      expect(second.right, ScoreLayout.measureLeft(score, 1) - 4);
+    },
+  );
 
   final example = Platform.environment['LYRIC_EXAMPLE'];
   test('user supplied MXL lyrics survive save and reopen', () async {

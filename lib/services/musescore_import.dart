@@ -147,7 +147,10 @@ String museScoreToMusicXml(XmlDocument document) {
       : (_text(nativeClef, 'concertClefType') ??
             _text(nativeClef, 'subtype') ??
             'G');
-  if (!clefName.startsWith('G') && !clefName.startsWith('F')) {
+  if (!clefName.startsWith('G') &&
+      !clefName.startsWith('F') &&
+      clefName != 'C3' &&
+      clefName != 'C4') {
     throw const FormatException('This MuseScore clef is not supported.');
   }
   final output = <XmlNode>[];
@@ -196,8 +199,22 @@ String museScoreToMusicXml(XmlDocument document) {
         _el(
           'clef',
           children: [
-            _el('sign', text: clefName.startsWith('F') ? 'F' : 'G'),
-            _el('line', text: clefName.startsWith('F') ? '4' : '2'),
+            _el(
+              'sign',
+              text: clefName.startsWith('C')
+                  ? 'C'
+                  : clefName.startsWith('F')
+                  ? 'F'
+                  : 'G',
+            ),
+            _el(
+              'line',
+              text: clefName.startsWith('C')
+                  ? clefName.substring(1)
+                  : clefName.startsWith('F')
+                  ? '4'
+                  : '2',
+            ),
             if (clefName.contains('8vb')) _el('clef-octave-change', text: '-1'),
             if (clefName.contains('8va')) _el('clef-octave-change', text: '1'),
           ],

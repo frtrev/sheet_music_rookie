@@ -180,25 +180,27 @@ class HomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ClefButton(
-                        symbol: '𝄞',
-                        label: 'Treble Clef',
-                        onTap: () => Navigator.pop(context, ClefType.treble),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ClefButton(
-                        symbol: '𝄢',
-                        label: 'Bass Clef',
-                        onTap: () => Navigator.pop(context, ClefType.bass),
-                      ),
-                    ),
-                  ],
-                ),
+                for (var row = 0; row < 2; row++) ...[
+                  if (row > 0) const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      for (var column = 0; column < 2; column++) ...[
+                        if (column > 0) const SizedBox(width: 12),
+                        Expanded(
+                          child: _ClefButton(
+                            symbol: ClefType.values[row * 2 + column].symbol,
+                            label:
+                                '${ClefType.values[row * 2 + column].label} Clef',
+                            onTap: () => Navigator.pop(
+                              context,
+                              ClefType.values[row * 2 + column],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

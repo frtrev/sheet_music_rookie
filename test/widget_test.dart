@@ -17,6 +17,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Treble Clef'), findsOneWidget);
     expect(find.text('Bass Clef'), findsOneWidget);
+    expect(find.text('Alto Clef'), findsOneWidget);
+    expect(find.text('Tenor Clef'), findsOneWidget);
 
     await tester.tap(find.text('Treble Clef'));
     await tester.pumpAndSettle();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:xml/xml.dart';
 
 import '../models/composition.dart';
+import '../models/phrase_draft.dart';
 import '../models/musical_note.dart';
 import '../models/measure.dart';
 import '../models/note_lyric.dart';
@@ -167,6 +168,48 @@ class ScoreLayout {
     return Offset(x, y);
   }
 
+  /// Horizontal lyric space, ending before the next note or the barline.
+  static Rect lyricBounds(
+    Composition composition,
+    int measureIndex,
+    int noteIndex,
+  ) {
+    final notes = composition.measures[measureIndex].notes;
+    final center = noteCenter(composition, measureIndex, notes[noteIndex]).dx;
+    final left = math.max(
+      measureLeft(composition, measureIndex) + 4,
+      center - 12,
+    );
+    final right = noteIndex + 1 < notes.length
+        ? noteCenter(composition, measureIndex, notes[noteIndex + 1]).dx - 16
+        : measureLeft(composition, measureIndex + 1) - 4;
+    return Rect.fromLTWH(left, 0, math.max(0, right - left), 0);
+  }
+
+  static Offset? tieTarget(
+    Composition composition,
+    int measureIndex,
+    MusicalNote note,
+  ) {
+    if (!note.tieToNext || note.isRest) return null;
+    final notes = composition.measures[measureIndex].notes;
+    final index = notes.indexOf(note);
+    if (index < 0) return null;
+    final targetMeasure = index + 1 < notes.length
+        ? measureIndex
+        : measureIndex + 1;
+    if (targetMeasure >= composition.measures.length) return null;
+    final targetNotes = composition.measures[targetMeasure].notes;
+    if (targetNotes.isEmpty) return null;
+    final target = targetNotes[targetMeasure == measureIndex ? index + 1 : 0];
+    if (!target.tieFromPrevious ||
+        target.isRest ||
+        target.midiPitch != note.midiPitch) {
+      return null;
+    }
+    return noteCenter(composition, targetMeasure, target);
+  }
+
   static int staffStep(
     ClefType clef,
     int midi, {
@@ -182,7 +225,7 @@ class ScoreLayout {
         : 0;
     final diatonic =
         (midi ~/ 12 - 1) * 7 + degreeForPitchClass[pitchClass] + flatAdjustment;
-    final bottomLine = clef == ClefType.treble ? 30 : 18;
+    final bottomLine = clef.bottomLineDiatonic;
     return diatonic - bottomLine;
   }
 
@@ -338,23 +381,31 @@ class ScoreView extends StatelessWidget {
     required this.composition,
     this.scrollController,
     this.selectedEventIndex,
+    this.selectedTick,
+    this.previewStartTick,
+    this.previewEndTick,
     this.playbackPosition = Duration.zero,
     this.showPlaybackCursor = false,
     this.practiceTargetTick,
     this.practiceProgress,
     this.cursorFollowFraction = .40,
     this.onCursorMoved,
+    this.pitchTrace = const [],
   });
 
   final Composition composition;
   final ScrollController? scrollController;
   final int? selectedEventIndex;
+  final int? selectedTick;
+  final int? previewStartTick;
+  final int? previewEndTick;
   final Duration playbackPosition;
   final bool showPlaybackCursor;
   final int? practiceTargetTick;
   final ValueListenable<double>? practiceProgress;
   final double cursorFollowFraction;
   final ValueChanged<Duration>? onCursorMoved;
+  final List<PitchTracePoint> pitchTrace;
 
   @override
   Widget build(BuildContext context) {
@@ -388,9 +439,18 @@ class ScoreView extends StatelessWidget {
                         painter: ScorePainter(
                           composition,
                           selectedEventIndex: selectedEventIndex,
+                          selectedTick: selectedTick,
+                          previewStartTick: previewStartTick,
+                          previewEndTick: previewEndTick,
                         ),
                       ),
                     ),
+                    if (pitchTrace.isNotEmpty)
+                      IgnorePointer(
+                        child: CustomPaint(
+                          painter: PitchTracePainter(composition, pitchTrace),
+                        ),
+                      ),
                     if (showPlaybackCursor)
                       IgnorePointer(
                         child: RepaintBoundary(
@@ -427,6 +487,52 @@ class ScoreView extends StatelessWidget {
     final ticks = ScoreLayout.tickAtX(composition, position.dx);
     onCursorMoved?.call(ScoreLayout.durationAt(ticks, composition.tempoBpm));
   }
+}
+
+class PitchTracePainter extends CustomPainter {
+  PitchTracePainter(this.composition, this.points);
+  final Composition composition;
+  final List<PitchTracePoint> points;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path();
+    var connected = false;
+    for (final point in points) {
+      if (point.midi == null) {
+        connected = false;
+        continue;
+      }
+      final written = point.midi! - composition.octaveRange.semitones;
+      final lower = written.floor().clamp(0, 126);
+      final fraction = written - lower;
+      final step =
+          ScoreLayout.staffStep(composition.clef, lower) * (1 - fraction) +
+          ScoreLayout.staffStep(composition.clef, lower + 1) * fraction;
+      final x = ScoreLayout.playbackCursorX(composition, point.tick);
+      final y =
+          ScoreLayout.staffTop +
+          4 * ScoreLayout.lineGap -
+          step * ScoreLayout.lineGap / 2;
+      if (connected) {
+        path.lineTo(x, y);
+      } else {
+        path.moveTo(x, y);
+      }
+      connected = true;
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xff00a8d6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant PitchTracePainter old) =>
+      old.composition != composition || old.points != points;
 }
 
 /// The moving cursor repaints independently of the staff and lyric layer.
@@ -521,11 +627,17 @@ class ScorePainter extends CustomPainter {
   ScorePainter(
     this.composition, {
     this.selectedEventIndex,
+    this.selectedTick,
+    this.previewStartTick,
+    this.previewEndTick,
     this.playbackPosition = Duration.zero,
     this.showPlaybackCursor = false,
   });
   final Composition composition;
   final int? selectedEventIndex;
+  final int? selectedTick;
+  final int? previewStartTick;
+  final int? previewEndTick;
   final Duration playbackPosition;
   final bool showPlaybackCursor;
 
@@ -558,8 +670,15 @@ class ScorePainter extends CustomPainter {
 
     _drawText(
       canvas,
-      composition.clef == ClefType.treble ? '𝄞' : '𝄢',
-      const Offset(28, 75),
+      composition.clef.symbol,
+      Offset(
+        28,
+        composition.clef == ClefType.tenor
+            ? 68
+            : composition.clef == ClefType.alto
+            ? 82
+            : 75,
+      ),
       54,
     );
     if (composition.octaveRange != OctaveRange.standard) {
@@ -720,27 +839,29 @@ class ScorePainter extends CustomPainter {
                 measure.notes[index + 1],
               ).dx
             : ScoreLayout.measureLeft(composition, measure.index + 1);
-        final previousX = index > 0
-            ? ScoreLayout.noteCenter(
-                composition,
-                measure.index,
-                measure.notes[index - 1],
-              ).dx
-            : ScoreLayout.measureLeft(composition, measure.index);
-        final available = math.max(
-          8.0,
-          math.min(nextX - center.dx, center.dx - previousX) - 4,
+        final bounds = ScoreLayout.lyricBounds(
+          composition,
+          measure.index,
+          index,
         );
+        final available = bounds.width;
         for (final lyric in note.lyrics) {
           final y = top + lines.indexOf(lyric.number) * 26;
           final text = _lyricPainter(lyric);
           final scale = text.width > available ? available / text.width : 1.0;
+          final renderedWidth = text.width * scale;
+          final left = (center.dx - renderedWidth / 2)
+              .clamp(
+                bounds.left,
+                math.max(bounds.left, bounds.right - renderedWidth),
+              )
+              .toDouble();
           canvas.save();
-          canvas.translate(center.dx - text.width * scale / 2, y);
+          canvas.translate(left, y);
           canvas.scale(scale, 1);
           text.paint(canvas, Offset.zero);
           canvas.restore();
-          final end = center.dx + text.width * scale / 2 + 3;
+          final end = left + renderedWidth + 3;
           if ((lyric.syllabic == 'begin' || lyric.syllabic == 'middle') &&
               nextX - end > 8) {
             _drawText(canvas, '−', Offset((end + nextX - 5) / 2 - 4, y), 12);
@@ -759,33 +880,7 @@ class ScorePainter extends CustomPainter {
     }
   }
 
-  Set<int> _selectedSourceEvents() {
-    final selected = selectedEventIndex;
-    if (selected == null) return const {};
-    final notes = composition.measures
-        .expand((measure) => measure.notes)
-        .toList();
-    final selectedNoteIndex = notes.indexWhere(
-      (note) => note.sourceEventIndex == selected,
-    );
-    if (selectedNoteIndex < 0) return {selected};
-    var start = selectedNoteIndex;
-    while (start > 0 &&
-        notes[start - 1].tieToNext &&
-        notes[start].tieFromPrevious) {
-      start--;
-    }
-    var end = selectedNoteIndex;
-    while (end + 1 < notes.length &&
-        notes[end].tieToNext &&
-        notes[end + 1].tieFromPrevious) {
-      end++;
-    }
-    return {
-      for (var index = start; index <= end; index++)
-        notes[index].sourceEventIndex,
-    };
-  }
+  Set<int> _selectedSourceEvents() => {?selectedEventIndex};
 
   void _drawNote(
     Canvas canvas,
@@ -797,6 +892,14 @@ class ScorePainter extends CustomPainter {
     final center = ScoreLayout.noteCenter(composition, measureIndex, note);
     final x = center.dx;
     final y = center.dy;
+    final absoluteTick =
+        composition.measureStartTick(measureIndex) + note.startTick;
+    final preview =
+        previewStartTick != null &&
+        previewEndTick != null &&
+        absoluteTick >= previewStartTick! &&
+        absoluteTick < previewEndTick!;
+    ink.color = preview ? const Color(0xffa0a8b8) : const Color(0xff242722);
     final step = ScoreLayout.staffStep(
       composition.clef,
       note.midiPitch,
@@ -804,7 +907,13 @@ class ScorePainter extends CustomPainter {
       flatSpelling: note.flatSpelling,
     );
 
-    if (selectedSources.contains(note.sourceEventIndex)) {
+    final noteTick =
+        composition.measureStartTick(measureIndex) + note.startTick;
+    final selected = selectedTick == null
+        ? selectedSources.contains(note.sourceEventIndex)
+        : selectedTick! >= noteTick &&
+              selectedTick! < noteTick + note.durationTicks;
+    if (selected) {
       canvas.drawCircle(
         center,
         15,
@@ -879,11 +988,24 @@ class ScorePainter extends CustomPainter {
           ..strokeWidth = 1,
       );
     }
-    if (note.tieToNext) {
+    final target = ScoreLayout.tieTarget(composition, measureIndex, note);
+    if (target != null) {
+      final span = target.dx - x;
+      final arch = (span * .12).clamp(10.0, 28.0);
       final tie = Path()
-        ..moveTo(x - 2, y + 12)
-        ..quadraticBezierTo(x + 14, y + 22, x + 28, y + 10);
-      canvas.drawPath(tie, ink..style = PaintingStyle.stroke);
+        ..moveTo(x, y + 9)
+        ..quadraticBezierTo(
+          (x + target.dx) / 2,
+          math.max(y, target.dy) + 9 + arch,
+          target.dx,
+          target.dy + 9,
+        );
+      canvas.drawPath(
+        tie,
+        ink
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
   }
 
@@ -894,12 +1016,20 @@ class ScorePainter extends CustomPainter {
     const bassSharps = [6, 3, 7, 4, 1, 5, 2];
     const trebleFlats = [4, 7, 3, 6, 2, 5, 1];
     const bassFlats = [2, 5, 1, 4, 0, 3, -1];
+    const altoSharps = [7, 4, 8, 5, 2, 6, 3];
+    const altoFlats = [3, 6, 2, 5, 1, 4, 0];
+    const tenorSharps = [2, 6, 3, 7, 4, 8, 5];
+    const tenorFlats = [5, 8, 4, 7, 3, 6, 2];
     final sharps = count > 0;
     final steps = switch ((composition.clef, sharps)) {
       (ClefType.treble, true) => trebleSharps,
       (ClefType.bass, true) => bassSharps,
       (ClefType.treble, false) => trebleFlats,
       (ClefType.bass, false) => bassFlats,
+      (ClefType.alto, true) => altoSharps,
+      (ClefType.alto, false) => altoFlats,
+      (ClefType.tenor, true) => tenorSharps,
+      (ClefType.tenor, false) => tenorFlats,
     };
     final bottom = ScoreLayout.staffTop + 4 * ScoreLayout.lineGap;
     for (var index = 0; index < count.abs(); index++) {
@@ -993,6 +1123,9 @@ class ScorePainter extends CustomPainter {
   bool shouldRepaint(covariant ScorePainter oldDelegate) =>
       oldDelegate.composition != composition ||
       oldDelegate.selectedEventIndex != selectedEventIndex ||
+      oldDelegate.selectedTick != selectedTick ||
+      oldDelegate.previewStartTick != previewStartTick ||
+      oldDelegate.previewEndTick != previewEndTick ||
       oldDelegate.playbackPosition != playbackPosition ||
       oldDelegate.showPlaybackCursor != showPlaybackCursor;
 }

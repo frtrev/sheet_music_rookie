@@ -65,3 +65,14 @@ Imported scores use the same editing, playback, practice, and testing tools as M
 ### GeneralUser GS sound library
 
 The instrument chip opens 37 curated GeneralUser GS presets grouped as Keyboards, Strings, and Winds. Piano, organs, guitar, bass, bowed strings, harp, brass, reeds, and flute-family instruments are available offline. Drum kits, percussion, synth pads/leads and sound effects are excluded from the picker. Playback, note previews and the test-result reference use the sampled bank in a background isolate. The bundled bank adds about 31 MB; no download is required at runtime. Credits and the complete bank license are available from **Playback instrument → Sound library licenses**. See [playback sound implementation](docs/playback-sound-options.md).
+
+### Phrase recording review
+
+In Settings → Recording analysis, choose **Review after a phrase** to capture
+monophonic phrases before writing notation. A thin cyan pitch trace appears
+while recording. After the configured silence (1 second by default), Stop, or
+**Review now**, background analysis displays grey preview notes and a floating
+Yes/No panel below the score. Yes writes the phrase as one undoable edit; No
+leaves the score unchanged. Recording waits for this choice, then can capture
+the next phrase. Each phrase is limited to 30 seconds. Live recording remains
+the default. Piano attack detection is heuristic; chords are not supported.
