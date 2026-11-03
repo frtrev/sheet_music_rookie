@@ -345,6 +345,7 @@ class TranscriptionEngine {
       final n = y.measures[i];
       if (m.beatsPerMeasure != n.beatsPerMeasure ||
           m.beatUnit != n.beatUnit ||
+          m.timeSignatureExplicit != n.timeSignatureExplicit ||
           !listEquals(m.barlines, n.barlines) ||
           m.notes.length != n.notes.length) {
         return false;
@@ -967,6 +968,7 @@ class TranscriptionEngine {
             barlines: measure.barlines,
             beatsPerMeasure: measure.beatsPerMeasure,
             beatUnit: measure.beatUnit,
+            timeSignatureExplicit: measure.timeSignatureExplicit,
           ),
       ],
     );
@@ -984,19 +986,40 @@ class TranscriptionEngine {
     final current = composition.value;
     if (current.measures.isEmpty) return;
     final measureIndex = current.measureIndexAtTick(tick);
+    var end = measureIndex + 1;
+    while (end < current.measures.length) {
+      final following = current.measures[end];
+      if (following.notes.any((note) => !note.isRest) ||
+          following.timeSignatureExplicit) {
+        break;
+      }
+      end++;
+    }
+    final nextBeats = beatsPerMeasure.clamp(1, 32);
     final templates = [
       for (final measure in current.measures)
         Measure(
           index: measure.index,
           notes: measure.notes,
           barlines: measure.barlines,
-          beatsPerMeasure: measure.index == measureIndex
-              ? beatsPerMeasure.clamp(1, 32)
-              : measure.beatsPerMeasure,
-          beatUnit: measure.index == measureIndex ? beatUnit : measure.beatUnit,
+          beatsPerMeasure: measure.index >= measureIndex && measure.index < end
+              ? nextBeats
+              : measure.effectiveBeats(current.beatsPerMeasure),
+          beatUnit: measure.index >= measureIndex && measure.index < end
+              ? beatUnit
+              : measure.effectiveBeatUnit(current.beatUnit),
+          timeSignatureExplicit:
+              measure.index == measureIndex || measure.timeSignatureExplicit,
         ),
     ];
-    composition.value = current.copyWith(measures: templates);
+    final emptyScore = current.measures.every(
+      (measure) => measure.notes.isEmpty,
+    );
+    composition.value = current.copyWith(
+      measures: templates,
+      beatsPerMeasure: measureIndex == 0 && emptyScore ? nextBeats : null,
+      beatUnit: measureIndex == 0 && emptyScore ? beatUnit : null,
+    );
     _rebuildComposition();
     notationCursorTick.value = tick
         .clamp(0, composition.value.editableEndTick)

@@ -197,6 +197,136 @@ void main() {
     expect(updated.measureStartTick(1), 480);
   });
 
+  test(
+    'new scores keep their chosen meter when recording and inserting bars',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+      );
+      engine.setMeasureTimeSignatureAtTick(0, beatsPerMeasure: 3, beatUnit: 4);
+      engine.overwriteFromTick(0, [
+        for (var i = 0; i < 7; i++) rawEvent(60 + i, 500),
+      ]);
+      expect(
+        engine.composition.value.measures.map((m) => m.effectiveBeats(4)),
+        everyElement(3),
+      );
+      expect(engine.composition.value.measures[0].notes.length, 3);
+      expect(engine.composition.value.measures[1].notes.length, 3);
+      engine.insertMeasureAfterTick(0);
+      expect(
+        engine.composition.value.measures.map((m) => m.capacityTicks(4, 4)),
+        everyElement(1440),
+      );
+    },
+  );
+
+  test(
+    'meter changes propagate through silent bars but stop at explicit changes',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+        initialComposition: const Composition(
+          clef: ClefType.treble,
+          measures: [Measure(index: 0), Measure(index: 1), Measure(index: 2)],
+        ),
+      );
+      engine.setMeasureTimeSignatureAtTick(
+        3840,
+        beatsPerMeasure: 5,
+        beatUnit: 8,
+      );
+      engine.setMeasureTimeSignatureAtTick(0, beatsPerMeasure: 3, beatUnit: 4);
+      expect(engine.composition.value.measures.map((m) => m.beatsPerMeasure), [
+        3,
+        3,
+        5,
+      ]);
+      expect(engine.composition.value.measures.map((m) => m.beatUnit), [
+        4,
+        4,
+        8,
+      ]);
+      engine.setMeasureTimeSignatureAtTick(0, beatsPerMeasure: 6, beatUnit: 8);
+      expect(engine.composition.value.measures.map((m) => m.beatsPerMeasure), [
+        6,
+        6,
+        5,
+      ]);
+      engine.undo();
+      expect(engine.composition.value.measures.map((m) => m.beatsPerMeasure), [
+        3,
+        3,
+        5,
+      ]);
+    },
+  );
+
+  test(
+    'silent inserted bars inherit subsequent changes and newly recorded bars',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+      );
+      engine.insertMeasureAfterTick(0);
+      engine.setMeasureTimeSignatureAtTick(0, beatsPerMeasure: 3, beatUnit: 4);
+      expect(
+        engine.composition.value.measures.map((m) => m.capacityTicks(4, 4)),
+        everyElement(1440),
+      );
+      final tick = engine.composition.value.measureStartTick(1);
+      engine.setMeasureTimeSignatureAtTick(
+        tick,
+        beatsPerMeasure: 6,
+        beatUnit: 8,
+      );
+      engine.overwriteFromTick(tick, [
+        for (var i = 0; i < 10; i++) rawEvent(60, 250),
+      ]);
+      expect(engine.composition.value.measures.first.capacityTicks(4, 4), 1440);
+      expect(
+        engine.composition.value.measures
+            .skip(1)
+            .map((m) => m.effectiveBeatUnit(4)),
+        everyElement(8),
+      );
+    },
+  );
+
+  test(
+    'reapplying a meter repairs stale blank bars from the previous default',
+    () {
+      final engine = TranscriptionEngine(
+        clef: ClefType.treble,
+        octaveRange: OctaveRange.standard,
+        microphone: FakeMicrophoneService(),
+        initialComposition: const Composition(
+          clef: ClefType.treble,
+          measures: [
+            Measure(
+              index: 0,
+              beatsPerMeasure: 3,
+              beatUnit: 4,
+              timeSignatureExplicit: true,
+            ),
+            Measure(index: 1),
+          ],
+        ),
+      );
+      engine.setMeasureTimeSignatureAtTick(0, beatsPerMeasure: 3, beatUnit: 4);
+      expect(
+        engine.composition.value.measures.map((m) => m.capacityTicks(4, 4)),
+        everyElement(1440),
+      );
+    },
+  );
+
   test('score scrolling reveals cursor movement forward and backward', () {
     final forward = ScoreLayout.scrollOffsetToRevealCursor(
       cursorX: 700,

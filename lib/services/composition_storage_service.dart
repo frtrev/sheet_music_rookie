@@ -135,6 +135,14 @@ class CompositionStorageService {
                 beatsPerMeasure:
                     (value as Map<String, dynamic>)['beatsPerMeasure'] as int,
                 beatUnit: value['beatUnit'] as int,
+                timeSignatureExplicit:
+                    value['timeSignatureExplicit'] as bool? ??
+                    (index == 0 ||
+                        value['beatsPerMeasure'] !=
+                            storedMeasureSignatures[index -
+                                1]['beatsPerMeasure'] ||
+                        value['beatUnit'] !=
+                            storedMeasureSignatures[index - 1]['beatUnit']),
                 barlines: (value['barlines'] as List? ?? const [])
                     .cast<String>(),
               ),
@@ -380,6 +388,7 @@ class CompositionStorageService {
           ],
           beatsPerMeasure: measureBeats,
           beatUnit: measureBeatUnit,
+          timeSignatureExplicit: localBeats != null || localBeatUnit != null,
         ),
       );
     }
@@ -590,6 +599,7 @@ class CompositionStorageService {
           ),
           'beatUnit': measure.effectiveBeatUnit(composition.beatUnit),
           'barlines': measure.barlines,
+          'timeSignatureExplicit': measure.timeSignatureExplicit,
         },
     ],
     'tempoBpm': composition.tempoBpm,
@@ -662,7 +672,9 @@ class CompositionStorageService {
         '    <measure number="${measure.index + 1}"${pickup ? ' implicit="yes"' : ''}>',
       );
       final timeChanged =
-          measureBeats != previousBeats || measureBeatUnit != previousBeatUnit;
+          measure.timeSignatureExplicit ||
+          measureBeats != previousBeats ||
+          measureBeatUnit != previousBeatUnit;
       if (measure.index == 0 || timeChanged) {
         buffer.writeln('      <attributes>');
         if (measure.index == 0) {

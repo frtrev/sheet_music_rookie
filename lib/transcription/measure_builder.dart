@@ -24,6 +24,8 @@ class MeasureBuilder {
 
     int capacityFor(int index) => index < measureTemplates.length
         ? measureTemplates[index].capacityTicks(beatsPerMeasure, beatUnit)
+        : measureTemplates.isNotEmpty
+        ? measureTemplates.last.capacityTicks(beatsPerMeasure, beatUnit)
         : beatsPerMeasure * 1920 ~/ beatUnit;
 
     for (final indexedEvent in events.indexed) {
@@ -112,11 +114,18 @@ class MeasureBuilder {
           barlines: index < measureTemplates.length
               ? measureTemplates[index].barlines
               : const [],
+          timeSignatureExplicit:
+              index < measureTemplates.length &&
+              measureTemplates[index].timeSignatureExplicit,
           beatsPerMeasure: index < measureTemplates.length
               ? measureTemplates[index].beatsPerMeasure
+              : measureTemplates.isNotEmpty
+              ? measureTemplates.last.effectiveBeats(beatsPerMeasure)
               : null,
           beatUnit: index < measureTemplates.length
               ? measureTemplates[index].beatUnit
+              : measureTemplates.isNotEmpty
+              ? measureTemplates.last.effectiveBeatUnit(beatUnit)
               : null,
           notes: _applyMeasureAccidentals(notesByMeasure[index], keySignature),
         ),

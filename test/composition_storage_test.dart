@@ -13,6 +13,77 @@ import 'package:xml/xml.dart';
 
 void main() {
   test(
+    'explicit and inherited meter boundaries survive save and load',
+    () async {
+      final root = await Directory.systemTemp.createTemp('meter-inheritance-');
+      addTearDown(() => root.delete(recursive: true));
+      final service = CompositionStorageService(
+        documentsDirectory: () async => root,
+      );
+      const events = [
+        RawNoteEvent(
+          startTimeMs: 0,
+          endTimeMs: 500,
+          frequencyHz: 440,
+          midiPitch: 69,
+          confidence: 1,
+        ),
+      ];
+      final score = Composition(
+        clef: ClefType.treble,
+        beatsPerMeasure: 3,
+        measures: const MeasureBuilder().build(
+          events,
+          120,
+          3,
+          measureTemplates: const [
+            Measure(
+              index: 0,
+              beatsPerMeasure: 3,
+              beatUnit: 4,
+              timeSignatureExplicit: true,
+            ),
+            Measure(index: 1, beatsPerMeasure: 3, beatUnit: 4),
+            Measure(
+              index: 2,
+              beatsPerMeasure: 5,
+              beatUnit: 8,
+              timeSignatureExplicit: true,
+            ),
+          ],
+        ),
+      );
+      final saved = await service.save(composition: score, rawEvents: events);
+      final loaded = await service.load(saved.path);
+      expect(loaded.composition.measures.map((m) => m.timeSignatureExplicit), [
+        true,
+        false,
+        true,
+      ]);
+      final extended = const MeasureBuilder().build(
+        [
+          for (var i = 0; i < 15; i++)
+            RawNoteEvent(
+              startTimeMs: i * 500,
+              endTimeMs: (i + 1) * 500,
+              frequencyHz: 440,
+              midiPitch: 69,
+              confidence: 1,
+            ),
+        ],
+        120,
+        3,
+        measureTemplates: loaded.composition.measures,
+      );
+      expect(extended.length, greaterThan(3));
+      expect(
+        extended.skip(2).map((m) => m.capacityTicks(3, 4)),
+        everyElement(1200),
+      );
+    },
+  );
+
+  test(
     'composition round-trips through a standards-shaped MXL archive',
     () async {
       final root = await Directory.systemTemp.createTemp('rookie-mxl-test-');

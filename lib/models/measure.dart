@@ -6,6 +6,7 @@ class Measure {
     this.notes = const [],
     this.beatsPerMeasure,
     this.beatUnit,
+    this.timeSignatureExplicit = false,
     this.barlines = const [],
   });
 
@@ -13,6 +14,9 @@ class Measure {
   final List<MusicalNote> notes;
   final int? beatsPerMeasure;
   final int? beatUnit;
+
+  /// A user/imported meter declaration, rather than an inherited signature.
+  final bool timeSignatureExplicit;
 
   /// Original MusicXML barlines, including repeat and numbered-ending marks.
   final List<String> barlines;
