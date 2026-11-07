@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/ios/iphone_other_required/01_main_menu.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,1217140,PASS,,a7b9bb8f896fd2bcc080ecead779ced71680b9b97274796cfdcfeba12e46b24c
+store_assets/ios/iphone_other_required/02_select_clef.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,568733,PASS,,e93431b10a8923b0e93bffcef56e0fb3924cac921c14a7e76ebc8cba21171013
+store_assets/ios/iphone_other_required/03_octave_range.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,547497,PASS,,92f0211684f19ae10a0bf46b6fc28692860a33e250b57b26d94f25f26366cf16
+store_assets/ios/iphone_other_required/04_musical_composition.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,185301,PASS,,58f0de2acad21a533f8e0604982ed7d0517d1728c708575d82181ccc1eaa61f0
+store_assets/ios/iphone_other_required/05_tempo_controls.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,189302,PASS,,4136f17ec434487d05ce493a5fb59d7036d3125f681c980328b5f0ec6434e97e
+store_assets/ios/iphone_other_required/06_insert_note.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,170352,PASS,,a2681bdb81b1cbf6c7188ab718834008abcb95177b0eb8a5139cf1919a91b2b7

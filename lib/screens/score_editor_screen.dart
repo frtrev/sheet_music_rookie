@@ -55,6 +55,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   late final Ticker _testCursorTicker;
   final ScreenAwakeService _screenAwake = ScreenAwakeService();
   final CompositionStorageService _storage = CompositionStorageService();
+  final GlobalKey<ScoreViewState> _scoreViewKey = GlobalKey<ScoreViewState>();
+  bool _lyricEditing = false;
   final ScrollController _scoreScroll = ScrollController();
   final ScrollController _pageScroll = ScrollController();
   bool _pausedByUser = true;
@@ -305,6 +307,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _leave() async {
+    _scoreViewKey.currentState?.finishLyricEditing();
     if (_leaving || _saving) return;
     _leaving = true;
     try {
@@ -357,6 +360,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _clear() async {
+    _scoreViewKey.currentState?.finishLyricEditing();
     if (_resolvePhraseFirst()) return;
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
@@ -391,6 +395,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   }
 
   Future<void> _save() async {
+    _scoreViewKey.currentState?.finishLyricEditing();
     if (_resolvePhraseFirst()) return;
     if (_saving) return;
     if (_testActive) await _stopTest(showResults: false);
@@ -401,7 +406,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       final controller = TextEditingController(
         text: title == 'Untitled Composition' ? '' : title,
       );
-      final selectedTitle = await showDialog<String>(
+      final titleRoute = DialogRoute<String>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Save composition'),
@@ -433,8 +438,10 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           ],
         ),
       );
+      final selectedTitle = await Navigator.of(context).push(titleRoute);
+      await titleRoute.completed;
       controller.dispose();
-      if (selectedTitle == null) return;
+      if (selectedTitle == null || !mounted) return;
       title = selectedTitle;
       _engine.setTitle(title);
     }
@@ -926,7 +933,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       text: '${_engine.composition.value.tempoBpm}',
     );
     final formKey = GlobalKey<FormState>();
-    final value = await showDialog<int>(
+    final tempoRoute = DialogRoute<int>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Tempo'),
@@ -969,6 +976,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         ],
       ),
     );
+    final value = await Navigator.of(context).push(tempoRoute);
+    await tempoRoute.completed;
     controller.dispose();
     if (value == null ||
         !mounted ||
@@ -1161,6 +1170,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (_practiceActive) await _stopPractice();
     final composition = _engine.composition.value;
     if (composition.measures.isEmpty) return;
+    if (!mounted) return;
     final selectedTick = _engine.notationCursorTick.value;
     final measureIndex = composition.measureIndexAtTick(selectedTick);
     final measure = composition.measures[measureIndex];
@@ -1239,6 +1249,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
     final composition = _engine.composition.value;
+    if (!mounted) return;
     var playbackVolume = composition.playbackVolume;
     var metronomeVolume = composition.metronomeVolume;
     final result = await showDialog<(double, double)>(
@@ -1339,6 +1350,25 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     } finally {
       if (mounted) setState(() => _historyBusy = false);
     }
+  }
+
+  Future<bool> _prepareLyricEditing(int tick) async {
+    if (_resolvePhraseFirst()) return false;
+    if (_testActive) await _stopTest(showResults: false);
+    if (_practiceActive) await _stopPractice();
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    _pausedByUser = true;
+    await _pauseRecording();
+    if (!mounted) return false;
+    _cancelAutomaticCursorScroll();
+    _engine.notationCursorTick.value = tick;
+    return true;
+  }
+
+  void _editLyrics() {
+    final tick = _engine.notationCursorTick.value;
+    unawaited(_scoreViewKey.currentState?.startLyricEditing(tick));
   }
 
   Future<void> _editSelectedNote({
@@ -1673,6 +1703,16 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                                     ),
                                     Expanded(
                                       child: ScoreView(
+                                        key: _scoreViewKey,
+                                        onLyricChanged: _engine.setLyricAtTick,
+                                        onLyricEditing: _prepareLyricEditing,
+                                        onLyricEditingChanged: (editing) {
+                                          if (mounted) {
+                                            setState(
+                                              () => _lyricEditing = editing,
+                                            );
+                                          }
+                                        },
                                         composition:
                                             draft?.preview ?? composition,
                                         pitchTrace: draft?.trace ?? const [],
@@ -1738,6 +1778,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 builder: (context, _, _) => ValueListenableBuilder<int>(
                   valueListenable: _engine.notationCursorTick,
                   builder: (context, cursorTick, _) => _NoteEditControls(
+                    lyricEditing: _lyricEditing,
+                    onEditLyrics: _editLyrics,
                     canUndo: !_historyBusy && _engine.canUndo,
                     canRedo: !_historyBusy && _engine.canRedo,
                     onUndo: () => unawaited(_changeHistory(redo: false)),
@@ -1747,10 +1789,20 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                     canToggleRest: _engine.canToggleRestAtTick(cursorTick),
                     canToggleTie: _engine.canToggleTieAtTick(cursorTick),
                     isTied: _engine.isTiedAtTick(cursorTick),
-                    onPitchUp: () =>
-                        unawaited(_editSelectedNote(pitchDelta: 1)),
-                    onPitchDown: () =>
-                        unawaited(_editSelectedNote(pitchDelta: -1)),
+                    onPitchUp: () {
+                      if (_scoreViewKey.currentState?.isEditingLyric ?? false) {
+                        _scoreViewKey.currentState!.moveLyricLine(-1);
+                      } else {
+                        unawaited(_editSelectedNote(pitchDelta: 1));
+                      }
+                    },
+                    onPitchDown: () {
+                      if (_scoreViewKey.currentState?.isEditingLyric ?? false) {
+                        _scoreViewKey.currentState!.moveLyricLine(1);
+                      } else {
+                        unawaited(_editSelectedNote(pitchDelta: -1));
+                      }
+                    },
                     onShorter: () =>
                         unawaited(_editSelectedNote(durationDelta: -1)),
                     onLonger: () =>
@@ -2103,6 +2155,8 @@ class _TransportButton extends StatelessWidget {
 
 class _NoteEditControls extends StatelessWidget {
   const _NoteEditControls({
+    required this.lyricEditing,
+    required this.onEditLyrics,
     required this.canUndo,
     required this.canRedo,
     required this.onUndo,
@@ -2123,6 +2177,8 @@ class _NoteEditControls extends StatelessWidget {
     required this.onInsertMeasure,
   });
 
+  final bool lyricEditing;
+  final VoidCallback onEditLyrics;
   final bool canUndo;
   final bool canRedo;
   final VoidCallback onUndo;
@@ -2173,13 +2229,15 @@ class _NoteEditControls extends StatelessWidget {
               ),
               _tool(
                 Icons.arrow_downward,
-                'Down one semitone',
+                lyricEditing ? 'Next lyric line' : 'Down one semitone',
                 hasEvent && !isRest ? onPitchDown : null,
+                keepLyricFocus: lyricEditing,
               ),
               _tool(
                 Icons.arrow_upward,
-                'Up one semitone',
+                lyricEditing ? 'Previous lyric line' : 'Up one semitone',
                 hasEvent && !isRest ? onPitchUp : null,
+                keepLyricFocus: lyricEditing,
               ),
               _tool(
                 Icons.arrow_back,
@@ -2196,6 +2254,11 @@ class _NoteEditControls extends StatelessWidget {
           const Divider(height: 8),
           Row(
             children: [
+              _tool(
+                Icons.lyrics_outlined,
+                'Edit lyrics',
+                hasEvent && !isRest ? onEditLyrics : null,
+              ),
               _tool(
                 isTied ? Icons.link_off : Icons.link,
                 isTied ? 'Remove tie' : 'Tie to next note',
@@ -2226,12 +2289,19 @@ class _NoteEditControls extends StatelessWidget {
     String tooltip,
     VoidCallback? onPressed, {
     Color? color,
+    bool keepLyricFocus = false,
   }) => Expanded(
-    child: IconButton(
-      icon: Icon(icon),
-      tooltip: tooltip,
-      onPressed: onPressed,
-      color: color,
+    child: TextFieldTapRegion(
+      enabled: keepLyricFocus,
+      child: ExcludeFocus(
+        excluding: keepLyricFocus,
+        child: IconButton(
+          icon: Icon(icon),
+          tooltip: tooltip,
+          onPressed: onPressed,
+          color: color,
+        ),
+      ),
     ),
   );
 }

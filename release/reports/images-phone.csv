@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/android/phone/01_main_menu.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,343560,PASS,,d324bf08c78a4bed63cd2d31d865caa4b25a0a3a29fe1fb8b058d47d0969ff1d
+store_assets/android/phone/02_select_clef.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,206395,PASS,,0fe71dd61ee248c8ac458b8949a63b7418bba76d793c75496fd94e48a7289f2e
+store_assets/android/phone/03_octave_range.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,249981,PASS,,348e1591538a2342495780ad66c8fb349b4f796e0f764091a98739ee316200de
+store_assets/android/phone/04_musical_composition.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,154706,PASS,,bf6fba054d80a6011e969cf1f40cb1fc75632462db291a4532c925e5ed5852fc
+store_assets/android/phone/05_tempo_controls.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,158725,PASS,,89f95fb82b0f84b96489866045beb9ee6540ad4a6135e6e82acf1916f16f2538
+store_assets/android/phone/06_insert_note.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,120536,PASS,,03083d519e8bda700b82c2533e103cde4ca6b81e1ad7de0f3727dc773afeaf68

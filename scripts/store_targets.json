@@ -1,0 +1,20 @@
+{
+  "verified_on": "2026-11-06",
+  "sources": {
+    "apple": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/",
+    "google": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en"
+  },
+  "screens": ["01_main_menu", "02_select_clef", "03_octave_range", "04_musical_composition", "05_tempo_controls", "06_insert_note"],
+  "groups": {
+    "iphone_other_required": {"path":"ios/iphone_other_required", "size":[1206,2622], "min":6, "max":10, "device":"iPhone 17 Pro", "category":"iPhone with Dynamic Island (medium display)", "required":true},
+    "iphone_large": {"path":"ios/iphone_large", "size":[1320,2868], "min":6, "max":10, "device":"iPhone 17 Pro Max", "category":"iPhone with Dynamic Island (large display)", "required":true},
+    "ipad": {"path":"ios/ipad", "size":[2064,2752], "min":6, "max":10, "device":"iPad Pro 13-inch (M5)", "category":"iPad 13 inch", "required":true},
+    "phone": {"path":"android/phone", "size":[1080,1920], "min":6, "max":8, "device":"smr_phone", "category":"Google Play phone, 9:16 promotional recommendation", "required":true},
+    "tablet_7": {"path":"android/tablet_7", "size":[1200,1920], "min":6, "max":8, "device":"smr_tablet_7", "category":"Google Play 7-inch tablet", "required":true},
+    "tablet_10": {"path":"android/tablet_10", "size":[1600,2560], "min":6, "max":8, "device":"smr_tablet_10", "category":"Google Play 10-inch tablet", "required":true}
+  },
+  "graphics": {
+    "android/icon/google_play_icon.png": {"size":[512,512],"max_bytes":1048576,"alpha":true},
+    "android/feature_graphic/feature_graphic.png": {"size":[1024,500],"max_bytes":15728640,"alpha":false}
+  }
+}

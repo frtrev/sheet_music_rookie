@@ -1,0 +1,39 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/ios/iphone_other_required/01_main_menu.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,1217140,PASS,,a7b9bb8f896fd2bcc080ecead779ced71680b9b97274796cfdcfeba12e46b24c
+store_assets/ios/iphone_other_required/02_select_clef.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,568733,PASS,,e93431b10a8923b0e93bffcef56e0fb3924cac921c14a7e76ebc8cba21171013
+store_assets/ios/iphone_other_required/03_octave_range.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,547497,PASS,,92f0211684f19ae10a0bf46b6fc28692860a33e250b57b26d94f25f26366cf16
+store_assets/ios/iphone_other_required/04_musical_composition.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,185301,PASS,,58f0de2acad21a533f8e0604982ed7d0517d1728c708575d82181ccc1eaa61f0
+store_assets/ios/iphone_other_required/05_tempo_controls.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,189302,PASS,,4136f17ec434487d05ce493a5fb59d7036d3125f681c980328b5f0ec6434e97e
+store_assets/ios/iphone_other_required/06_insert_note.png,1206x2622,1206x2622,iPhone with Dynamic Island (medium display),PNG/8-bit/color-type-2,170352,PASS,,a2681bdb81b1cbf6c7188ab718834008abcb95177b0eb8a5139cf1919a91b2b7
+store_assets/ios/iphone_large/01_main_menu.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,1342698,PASS,,1d99bebf82df2751c481ac13e3e01129ddb260235bdc5dc2712a2fb0c730cb04
+store_assets/ios/iphone_large/02_select_clef.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,711686,PASS,,dedd13e97f51e00a9ea7a65b2ea19f16334143c7082ddc892ce4f871033fa704
+store_assets/ios/iphone_large/03_octave_range.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,678572,PASS,,ea5adb7e1e98755fb4b38bc3f7ee54074bba2b736b87fda470e3ca84ab3c1613
+store_assets/ios/iphone_large/04_musical_composition.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,229378,PASS,,f79915220d5d2d424cc8cf307be6435b05641c5f229092649157b6ab5cec31e2
+store_assets/ios/iphone_large/05_tempo_controls.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,236416,PASS,,bb497da5ecb33058b3f9971976c8d5cda5ea1a8f7a372240fcf666664b2f1fae
+store_assets/ios/iphone_large/06_insert_note.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,184946,PASS,,980417937e6f79e97a67ac002bacee5fcd7b07dc31868cfb27d9a7fae3a6e909
+store_assets/ios/ipad/01_main_menu.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1609200,PASS,,d2ce155a5144698a0839982ce752d069004ed60ba2c4e79af887b175eb460f13
+store_assets/ios/ipad/02_select_clef.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1212973,PASS,,f17607b808ae8f9b5d3ab77c439aae695e7ad9b0379ca9a66c36102b6cd5f3d8
+store_assets/ios/ipad/03_octave_range.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1263841,PASS,,fd66f7fa1ab57feee7374bde78b58bda5c31c5ba543e6a3a5366f696bc325d7e
+store_assets/ios/ipad/04_musical_composition.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,260944,PASS,,5083d013e29f92132c1c42df09f94b5dda111312db198bee4cec7202993ba1ab
+store_assets/ios/ipad/05_tempo_controls.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,260839,PASS,,6e6e0f84b3535a7e3af52b61da36cd0cbd5b8c0e8e28d1709baa0f5d3f804c4f
+store_assets/ios/ipad/06_insert_note.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,274071,PASS,,d5d24471a854692fa24320618059469d36e1110fabe6d8132133d4572e42d8d4
+store_assets/android/phone/01_main_menu.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,343560,PASS,,d324bf08c78a4bed63cd2d31d865caa4b25a0a3a29fe1fb8b058d47d0969ff1d
+store_assets/android/phone/02_select_clef.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,206395,PASS,,0fe71dd61ee248c8ac458b8949a63b7418bba76d793c75496fd94e48a7289f2e
+store_assets/android/phone/03_octave_range.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,249981,PASS,,348e1591538a2342495780ad66c8fb349b4f796e0f764091a98739ee316200de
+store_assets/android/phone/04_musical_composition.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,154706,PASS,,bf6fba054d80a6011e969cf1f40cb1fc75632462db291a4532c925e5ed5852fc
+store_assets/android/phone/05_tempo_controls.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,158725,PASS,,89f95fb82b0f84b96489866045beb9ee6540ad4a6135e6e82acf1916f16f2538
+store_assets/android/phone/06_insert_note.png,1080x1920,1080x1920,"Google Play phone, 9:16 promotional recommendation",PNG/8-bit/color-type-2,120536,PASS,,03083d519e8bda700b82c2533e103cde4ca6b81e1ad7de0f3727dc773afeaf68
+store_assets/android/tablet_7/01_main_menu.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,318724,PASS,,f969d1e0be3497218ee9881198341a684ba6435586d16e9256486e1b387ccfef
+store_assets/android/tablet_7/02_select_clef.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,198547,PASS,,83f796e7d31aff9adc83694d5782d115f1aec897775bf1484d669bf1aa8691c1
+store_assets/android/tablet_7/03_octave_range.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,235995,PASS,,83c9d371e09b26ab766436b831686f7f43738fdee61d1a2f3ae303c758457320
+store_assets/android/tablet_7/04_musical_composition.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,158680,PASS,,8f69fd40eb43d6aa100b3fb737bbda6d0b2dcdc345bc804eb4b5b7314af4ab1f
+store_assets/android/tablet_7/05_tempo_controls.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,162686,PASS,,80252af8858ecda52540bfd786cdaffb680e9685858cded2d495b3df3e75e48e
+store_assets/android/tablet_7/06_insert_note.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,116196,PASS,,5330389ef814e3e991290967db662e39d8582b8cb0792e1b68bf6638bf459419
+store_assets/android/tablet_10/01_main_menu.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,359514,PASS,,edfaba845ef2f58f07f024c1b9575a8a41b8537289431eb39657b0f037c3260c
+store_assets/android/tablet_10/02_select_clef.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,279902,PASS,,b648277b78060c0f1a66d84c02a15910b39c5284cff9bfd5eb4fb71dc6cba89b
+store_assets/android/tablet_10/03_octave_range.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,323148,PASS,,8d87ccceb36dfec14ffcf1b7fe47c636cf95d3cf4f01281120daf325ec8f8f8d
+store_assets/android/tablet_10/04_musical_composition.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,201651,PASS,,ebb91cb95aaef9e01fe0d1967dd0805533e3159fbd2ed9ea9a264ca3e304cef7
+store_assets/android/tablet_10/05_tempo_controls.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,197656,PASS,,69141af440e1c563b333079fedfe181c2f15de2730916e9fdae080b69f85f611
+store_assets/android/tablet_10/06_insert_note.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,208204,PASS,,28971f59b750760ec87421d6de75f6da2d2b6c46b8b10ec2b51d6679f218d71e
+store_assets/android/icon/google_play_icon.png,512x512,512x512,Google Play icon,PNG/8-bit/color-type-6,377979,PASS,,b3f58d40e3c2c23c42040c512bf0a07f2457e83ce93dad136dd11f6595671b50
+store_assets/android/feature_graphic/feature_graphic.png,1024x500,1024x500,Google Play feature graphic,PNG/8-bit/color-type-2,442941,PASS,,efdd7fc3a91184143b3d6e058e91924438908c55fa9ff99f36653bc6300392b3

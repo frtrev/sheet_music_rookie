@@ -402,7 +402,7 @@ class _ClefButton extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Text(symbol, style: const TextStyle(fontSize: 58, height: 1)),
+          Text(symbol, style: const TextStyle(fontSize: 48, height: 1.8)),
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],

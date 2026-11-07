@@ -762,6 +762,28 @@ class TranscriptionEngine {
     return null;
   }
 
+  /// One history entry per completed lyric edit, including verse deletion.
+  void setLyricAtTick(int tick, String line, String text) {
+    final index = eventIndexAtTick(tick);
+    if (index == null || rawEvents[index].isRest) return;
+    final event = rawEvents[index];
+    final lyrics = [...event.lyrics];
+    final lyricIndex = lyrics.indexWhere((lyric) => lyric.number == line);
+    if (text.trim().isEmpty) {
+      if (lyricIndex < 0) return;
+      lyrics.removeAt(lyricIndex);
+    } else if (lyricIndex >= 0) {
+      if (lyrics[lyricIndex].text == text) return;
+      lyrics[lyricIndex] = lyrics[lyricIndex].withText(text);
+    } else {
+      lyrics.add(NoteLyric.fromText(line, text));
+    }
+    _edit(() {
+      rawEvents[index] = event.copyWith(lyrics: lyrics);
+      _rebuildComposition();
+    });
+  }
+
   bool isRestAtTick(int tick) {
     final index = eventIndexAtTick(tick);
     return index != null && rawEvents[index].isRest;

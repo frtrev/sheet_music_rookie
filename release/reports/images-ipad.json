@@ -1,0 +1,72 @@
+{
+  "verified_on": "2026-11-06",
+  "passed": true,
+  "files": [
+    {
+      "filename": "store_assets/ios/ipad/01_main_menu.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 1609200,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "d2ce155a5144698a0839982ce752d069004ed60ba2c4e79af887b175eb460f13"
+    },
+    {
+      "filename": "store_assets/ios/ipad/02_select_clef.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 1212973,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "f17607b808ae8f9b5d3ab77c439aae695e7ad9b0379ca9a66c36102b6cd5f3d8"
+    },
+    {
+      "filename": "store_assets/ios/ipad/03_octave_range.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 1263841,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "fd66f7fa1ab57feee7374bde78b58bda5c31c5ba543e6a3a5366f696bc325d7e"
+    },
+    {
+      "filename": "store_assets/ios/ipad/04_musical_composition.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 260944,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "5083d013e29f92132c1c42df09f94b5dda111312db198bee4cec7202993ba1ab"
+    },
+    {
+      "filename": "store_assets/ios/ipad/05_tempo_controls.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 260839,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "6e6e0f84b3535a7e3af52b61da36cd0cbd5b8c0e8e28d1709baa0f5d3f804c4f"
+    },
+    {
+      "filename": "store_assets/ios/ipad/06_insert_note.png",
+      "actual_dimensions": "2064x2752",
+      "target_dimensions": "2064x2752",
+      "device_class": "iPad 13 inch",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 274071,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "d5d24471a854692fa24320618059469d36e1110fabe6d8132133d4572e42d8d4"
+    }
+  ]
+}

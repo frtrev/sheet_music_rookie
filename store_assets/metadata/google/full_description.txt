@@ -1,0 +1,23 @@
+Turn a melody into sheet music, one note at a time.
+
+Sheet Music Rookie listens through your device microphone and estimates musical notes and rhythms on your device. Review your melody, edit the score, and hear it played back with instrument sounds.
+
+CREATE AND SHAPE YOUR MUSIC
+• Choose Treble, Bass, Alto, or Tenor clef and an octave range.
+• Capture a single melody live or review a phrase before adding it.
+• Edit pitches and durations, insert notes and rests, add ties and lyrics, and use undo and redo.
+• Set tempo, key signature, and time signatures.
+
+LISTEN AND PRACTICE
+• Play your score with local instrument sounds.
+• Use the metronome, practice tools, and melody tests.
+• Adjust detection settings to suit your voice and environment.
+
+KEEP YOUR SCORES
+• Save compositions locally and reopen them later.
+• Share saved compressed MusicXML files through your device’s share interface.
+• Open compatible MusicXML and MuseScore files from other apps.
+
+Core features work offline without an account. Microphone access is used for listening features. Microphone audio is processed locally rather than uploaded or saved as a voice recording. Saved scores contain musical notes and timing, and may include titles or lyrics you enter.
+
+For best results, sing one clear note at a time in a quiet room and set a suitable tempo. Detection is an estimate: review and edit the notation. This app is intended for a single melody, rather than transcription of a full band or polyphonic recording.

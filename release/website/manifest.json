@@ -1,0 +1,42 @@
+[
+  {
+    "path": "assets/sheet-music-rookie/01_main_menu.png",
+    "before_sha256": null,
+    "after_sha256": "d324bf08c78a4bed63cd2d31d865caa4b25a0a3a29fe1fb8b058d47d0969ff1d"
+  },
+  {
+    "path": "assets/sheet-music-rookie/04_musical_composition.png",
+    "before_sha256": null,
+    "after_sha256": "bf6fba054d80a6011e969cf1f40cb1fc75632462db291a4532c925e5ed5852fc"
+  },
+  {
+    "path": "assets/sheet-music-rookie/06_insert_note.png",
+    "before_sha256": null,
+    "after_sha256": "03083d519e8bda700b82c2533e103cde4ca6b81e1ad7de0f3727dc773afeaf68"
+  },
+  {
+    "path": "assets/sheet-music-rookie/app-icon.png",
+    "before_sha256": null,
+    "after_sha256": "a5656c1f2a1750e9c3b7bfef270ebc7e2659ea30bb96737c8f4c0e867ba1a293"
+  },
+  {
+    "path": "index.html",
+    "before_sha256": "ad8497a33502195204dcc62d6a983befb7522151e0f0fb8f79af3065e9c467ab",
+    "after_sha256": "0bf72fa1bca7c482ee1896b96f2131bac08ec513d71ad0f1035c18343a35388b"
+  },
+  {
+    "path": "sheet-music-rookie/index.html",
+    "before_sha256": null,
+    "after_sha256": "21043fb945a5ae7aba24bfb09c460e098e8e8089904d1c822f56391bf400cc9e"
+  },
+  {
+    "path": "sheet-music-rookie/privacy-policy/index.html",
+    "before_sha256": null,
+    "after_sha256": "f40c93d58b4325690ac712b824d4e22d1145ad8c5586fa82bbb423f39c49acb8"
+  },
+  {
+    "path": "sheet-music-rookie/support/index.html",
+    "before_sha256": null,
+    "after_sha256": "17997b0d6e63f318a294f279cfb25bc8b42fdffd0e931a075bda538e05af8a6a"
+  }
+]

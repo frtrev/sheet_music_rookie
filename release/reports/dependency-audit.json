@@ -1,0 +1,200 @@
+{
+  "plugins": {
+    "ios": [
+      {
+        "name": "audioplayers_darwin",
+        "version_source": "audioplayers_darwin-6.5.0",
+        "development_dependency": false,
+        "privacy_manifests": []
+      },
+      {
+        "name": "integration_test",
+        "version_source": "integration_test",
+        "development_dependency": true,
+        "privacy_manifests": []
+      },
+      {
+        "name": "package_info_plus",
+        "version_source": "package_info_plus-10.2.2",
+        "development_dependency": false,
+        "privacy_manifests": [
+          {
+            "path": "ios/package_info_plus/Sources/package_info_plus/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "macos/package_info_plus/Sources/package_info_plus/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "path_provider_foundation",
+        "version_source": "path_provider_foundation-2.6.0",
+        "development_dependency": false,
+        "privacy_manifests": []
+      },
+      {
+        "name": "record_ios",
+        "version_source": "record_ios-1.2.1",
+        "development_dependency": false,
+        "privacy_manifests": [
+          {
+            "path": "ios/record_ios/Sources/record_ios/Resources/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "share_plus",
+        "version_source": "share_plus-13.3.1",
+        "development_dependency": false,
+        "privacy_manifests": [
+          {
+            "path": "ios/share_plus/Sources/share_plus/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "macos/share_plus/Sources/share_plus/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "shared_preferences_foundation",
+        "version_source": "shared_preferences_foundation-2.5.7",
+        "development_dependency": false,
+        "privacy_manifests": [
+          {
+            "path": "darwin/shared_preferences_foundation/Sources/shared_preferences_foundation/Resources/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "1C8F.1"
+                  ]
+                }
+              ],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          }
+        ]
+      },
+      {
+        "name": "wakelock_plus",
+        "version_source": "wakelock_plus-1.8.2",
+        "development_dependency": false,
+        "privacy_manifests": [
+          {
+            "path": "ios/wakelock_plus/Sources/wakelock_plus/Resources/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "macos/wakelock_plus/Sources/wakelock_plus/Resources/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          }
+        ]
+      }
+    ],
+    "android": [
+      {
+        "name": "audioplayers_android",
+        "version_source": "audioplayers_android-5.3.0",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "integration_test",
+        "version_source": "integration_test",
+        "development_dependency": true,
+        "manifest_permissions": []
+      },
+      {
+        "name": "jni",
+        "version_source": "jni-1.1.0",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "jni_flutter",
+        "version_source": "jni_flutter-1.0.4+1",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "package_info_plus",
+        "version_source": "package_info_plus-10.2.2",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "path_provider_android",
+        "version_source": "path_provider_android-2.3.1",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "record_android",
+        "version_source": "record_android-1.5.2",
+        "development_dependency": false,
+        "manifest_permissions": [
+          "android.permission.RECORD_AUDIO"
+        ]
+      },
+      {
+        "name": "share_plus",
+        "version_source": "share_plus-13.3.1",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "shared_preferences_android",
+        "version_source": "shared_preferences_android-2.4.28",
+        "development_dependency": false,
+        "manifest_permissions": []
+      },
+      {
+        "name": "wakelock_plus",
+        "version_source": "wakelock_plus-1.8.2",
+        "development_dependency": false,
+        "manifest_permissions": []
+      }
+    ]
+  },
+  "app_source_network_clients": []
+}

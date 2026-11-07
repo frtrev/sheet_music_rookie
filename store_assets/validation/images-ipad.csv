@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/ios/ipad/01_main_menu.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1609200,PASS,,d2ce155a5144698a0839982ce752d069004ed60ba2c4e79af887b175eb460f13
+store_assets/ios/ipad/02_select_clef.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1212973,PASS,,f17607b808ae8f9b5d3ab77c439aae695e7ad9b0379ca9a66c36102b6cd5f3d8
+store_assets/ios/ipad/03_octave_range.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,1263841,PASS,,fd66f7fa1ab57feee7374bde78b58bda5c31c5ba543e6a3a5366f696bc325d7e
+store_assets/ios/ipad/04_musical_composition.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,260944,PASS,,5083d013e29f92132c1c42df09f94b5dda111312db198bee4cec7202993ba1ab
+store_assets/ios/ipad/05_tempo_controls.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,260839,PASS,,6e6e0f84b3535a7e3af52b61da36cd0cbd5b8c0e8e28d1709baa0f5d3f804c4f
+store_assets/ios/ipad/06_insert_note.png,2064x2752,2064x2752,iPad 13 inch,PNG/8-bit/color-type-2,274071,PASS,,d5d24471a854692fa24320618059469d36e1110fabe6d8132133d4572e42d8d4

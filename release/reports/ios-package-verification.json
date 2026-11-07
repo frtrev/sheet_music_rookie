@@ -1,0 +1,15 @@
+{
+  "ipa": "build/ios/ipa/sheet_music_rookie.ipa",
+  "sha256": "92d53ca88bf289d020c1a03f92aaeb4d04bf913308ac0123f9c0f2970217e1ae",
+  "bytes": 54580946,
+  "signature_verification": "PASS",
+  "bundle_id": "com.sheetmusicrookie.sheetMusicRookie",
+  "version": "1.0.0",
+  "build": "1",
+  "team_preserved": true,
+  "app_store_distribution_profile": true,
+  "debugger_entitlement": false,
+  "profile_expiration_utc": "2027-07-30T19:30:46Z",
+  "privacy_manifest_present": true,
+  "sdk": "iphoneos27.0"
+}

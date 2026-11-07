@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/android/tablet_10/01_main_menu.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,359514,PASS,,edfaba845ef2f58f07f024c1b9575a8a41b8537289431eb39657b0f037c3260c
+store_assets/android/tablet_10/02_select_clef.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,279902,PASS,,b648277b78060c0f1a66d84c02a15910b39c5284cff9bfd5eb4fb71dc6cba89b
+store_assets/android/tablet_10/03_octave_range.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,323148,PASS,,8d87ccceb36dfec14ffcf1b7fe47c636cf95d3cf4f01281120daf325ec8f8f8d
+store_assets/android/tablet_10/04_musical_composition.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,201651,PASS,,ebb91cb95aaef9e01fe0d1967dd0805533e3159fbd2ed9ea9a264ca3e304cef7
+store_assets/android/tablet_10/05_tempo_controls.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,197656,PASS,,69141af440e1c563b333079fedfe181c2f15de2730916e9fdae080b69f85f611
+store_assets/android/tablet_10/06_insert_note.png,1600x2560,1600x2560,Google Play 10-inch tablet,PNG/8-bit/color-type-2,208204,PASS,,28971f59b750760ec87421d6de75f6da2d2b6c46b8b10ec2b51d6679f218d71e

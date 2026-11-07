@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/android/tablet_7/01_main_menu.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,318724,PASS,,f969d1e0be3497218ee9881198341a684ba6435586d16e9256486e1b387ccfef
+store_assets/android/tablet_7/02_select_clef.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,198547,PASS,,83f796e7d31aff9adc83694d5782d115f1aec897775bf1484d669bf1aa8691c1
+store_assets/android/tablet_7/03_octave_range.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,235995,PASS,,83c9d371e09b26ab766436b831686f7f43738fdee61d1a2f3ae303c758457320
+store_assets/android/tablet_7/04_musical_composition.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,158680,PASS,,8f69fd40eb43d6aa100b3fb737bbda6d0b2dcdc345bc804eb4b5b7314af4ab1f
+store_assets/android/tablet_7/05_tempo_controls.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,162686,PASS,,80252af8858ecda52540bfd786cdaffb680e9685858cded2d495b3df3e75e48e
+store_assets/android/tablet_7/06_insert_note.png,1200x1920,1200x1920,Google Play 7-inch tablet,PNG/8-bit/color-type-2,116196,PASS,,5330389ef814e3e991290967db662e39d8582b8cb0792e1b68bf6638bf459419

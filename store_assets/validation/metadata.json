@@ -1,0 +1,58 @@
+[
+  {
+    "platform": "google",
+    "field": "title",
+    "characters": 18,
+    "limit": 30,
+    "status": "PASS"
+  },
+  {
+    "platform": "google",
+    "field": "short_description",
+    "characters": 65,
+    "limit": 80,
+    "status": "PASS"
+  },
+  {
+    "platform": "google",
+    "field": "full_description",
+    "characters": 1492,
+    "limit": 4000,
+    "status": "PASS"
+  },
+  {
+    "platform": "apple",
+    "field": "name",
+    "characters": 18,
+    "limit": 30,
+    "status": "PASS"
+  },
+  {
+    "platform": "apple",
+    "field": "subtitle",
+    "characters": 30,
+    "limit": 30,
+    "status": "PASS"
+  },
+  {
+    "platform": "apple",
+    "field": "promotional_text",
+    "characters": 153,
+    "limit": 170,
+    "status": "PASS"
+  },
+  {
+    "platform": "apple",
+    "field": "description",
+    "characters": 1492,
+    "limit": 4000,
+    "status": "PASS"
+  },
+  {
+    "platform": "apple",
+    "field": "keywords",
+    "characters": 83,
+    "limit": 100,
+    "status": "PASS"
+  }
+]

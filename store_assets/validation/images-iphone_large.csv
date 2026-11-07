@@ -1,0 +1,7 @@
+filename,actual_dimensions,target_dimensions,device_class,format,bytes,status,reason,sha256
+store_assets/ios/iphone_large/01_main_menu.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,1342698,PASS,,1d99bebf82df2751c481ac13e3e01129ddb260235bdc5dc2712a2fb0c730cb04
+store_assets/ios/iphone_large/02_select_clef.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,711686,PASS,,dedd13e97f51e00a9ea7a65b2ea19f16334143c7082ddc892ce4f871033fa704
+store_assets/ios/iphone_large/03_octave_range.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,678572,PASS,,ea5adb7e1e98755fb4b38bc3f7ee54074bba2b736b87fda470e3ca84ab3c1613
+store_assets/ios/iphone_large/04_musical_composition.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,229378,PASS,,f79915220d5d2d424cc8cf307be6435b05641c5f229092649157b6ab5cec31e2
+store_assets/ios/iphone_large/05_tempo_controls.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,236416,PASS,,bb497da5ecb33058b3f9971976c8d5cda5ea1a8f7a372240fcf666664b2f1fae
+store_assets/ios/iphone_large/06_insert_note.png,1320x2868,1320x2868,iPhone with Dynamic Island (large display),PNG/8-bit/color-type-2,184946,PASS,,980417937e6f79e97a67ac002bacee5fcd7b07dc31868cfb27d9a7fae3a6e909

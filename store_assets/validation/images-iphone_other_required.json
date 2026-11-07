@@ -1,0 +1,72 @@
+{
+  "verified_on": "2026-11-06",
+  "passed": true,
+  "files": [
+    {
+      "filename": "store_assets/ios/iphone_other_required/01_main_menu.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 1217140,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "a7b9bb8f896fd2bcc080ecead779ced71680b9b97274796cfdcfeba12e46b24c"
+    },
+    {
+      "filename": "store_assets/ios/iphone_other_required/02_select_clef.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 568733,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "e93431b10a8923b0e93bffcef56e0fb3924cac921c14a7e76ebc8cba21171013"
+    },
+    {
+      "filename": "store_assets/ios/iphone_other_required/03_octave_range.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 547497,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "92f0211684f19ae10a0bf46b6fc28692860a33e250b57b26d94f25f26366cf16"
+    },
+    {
+      "filename": "store_assets/ios/iphone_other_required/04_musical_composition.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 185301,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "58f0de2acad21a533f8e0604982ed7d0517d1728c708575d82181ccc1eaa61f0"
+    },
+    {
+      "filename": "store_assets/ios/iphone_other_required/05_tempo_controls.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 189302,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "4136f17ec434487d05ce493a5fb59d7036d3125f681c980328b5f0ec6434e97e"
+    },
+    {
+      "filename": "store_assets/ios/iphone_other_required/06_insert_note.png",
+      "actual_dimensions": "1206x2622",
+      "target_dimensions": "1206x2622",
+      "device_class": "iPhone with Dynamic Island (medium display)",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 170352,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "a2681bdb81b1cbf6c7188ab718834008abcb95177b0eb8a5139cf1919a91b2b7"
+    }
+  ]
+}

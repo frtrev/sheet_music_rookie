@@ -46,3 +46,14 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Generated release binaries/raw captures and transient logs
+/store_assets/raw/
+/release/android/*
+/release/ios/*
+/release/reports/*.log
+/release/store_assets/
+/release/store_metadata/
+/release/website/frtrev.github.io/
+!/release/android/README.md
+!/release/ios/README.md

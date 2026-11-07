@@ -1,0 +1,134 @@
+{
+  "android": {
+    "release_manifests": [
+      {
+        "file": "build/app/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml",
+        "package": "com.sheetmusicrookie.sheet_music_rookie",
+        "permissions": [
+          "android.permission.RECORD_AUDIO",
+          "com.sheetmusicrookie.sheet_music_rookie.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        ],
+        "min_sdk": "24",
+        "target_sdk": "36",
+        "debuggable": "false",
+        "unexpected_permissions": []
+      }
+    ]
+  },
+  "ios": {
+    "archives": [
+      {
+        "archive": "build/ios/archive/Runner.xcarchive",
+        "bundle_id": "com.sheetmusicrookie.sheetMusicRookie",
+        "version": "1.0.0",
+        "build": "1",
+        "minimum_os": "15.0",
+        "device_families": [
+          1,
+          2
+        ],
+        "sdk": "iphoneos27.0",
+        "microphone_message": "Sheet Music Rookie uses your microphone to detect musical notes and help create sheet music.",
+        "privacy_manifests": [
+          {
+            "path": "PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyAccessedAPITypes": [
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "C617.1"
+                  ]
+                },
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "CA92.1"
+                  ]
+                }
+              ],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false,
+              "NSPrivacyTrackingDomains": []
+            }
+          },
+          {
+            "path": "share_plus_share_plus.bundle/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "record_ios_record_ios.bundle/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "shared_preferences_foundation_shared_preferences_foundation.bundle/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "1C8F.1"
+                  ]
+                }
+              ],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "wakelock_plus_wakelock_plus.bundle/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "package_info_plus_package_info_plus.bundle/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyAccessedAPITypes": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyTracking": false
+            }
+          },
+          {
+            "path": "Frameworks/Flutter.framework/PrivacyInfo.xcprivacy",
+            "declarations": {
+              "NSPrivacyTracking": false,
+              "NSPrivacyTrackingDomains": [],
+              "NSPrivacyCollectedDataTypes": [],
+              "NSPrivacyAccessedAPITypes": [
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryFileTimestamp",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "0A2A.1",
+                    "C617.1"
+                  ]
+                },
+                {
+                  "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategorySystemBootTime",
+                  "NSPrivacyAccessedAPITypeReasons": [
+                    "35F9.1"
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

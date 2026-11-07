@@ -10,6 +10,7 @@ import '../models/musical_note.dart';
 import '../models/measure.dart';
 import '../models/note_lyric.dart';
 import 'rest_symbol.dart';
+import '../widgets/inline_lyric_editor.dart';
 
 class _LayoutCache {
   final widths = <int, double>{};
@@ -184,6 +185,31 @@ class ScoreLayout {
         ? noteCenter(composition, measureIndex, notes[noteIndex + 1]).dx - 16
         : measureLeft(composition, measureIndex + 1) - 4;
     return Rect.fromLTWH(left, 0, math.max(0, right - left), 0);
+  }
+
+  /// The painted text rectangle, shared by rendering and double-tap hit testing.
+  static Rect lyricTextBounds(
+    Composition composition,
+    int measureIndex,
+    int noteIndex,
+    NoteLyric lyric, {
+    List<String>? lines,
+  }) {
+    final note = composition.measures[measureIndex].notes[noteIndex];
+    final bounds = lyricBounds(composition, measureIndex, noteIndex);
+    final text = _lyricPainter(lyric);
+    final renderedWidth = math.min(text.width, bounds.width);
+    final center = noteCenter(composition, measureIndex, note).dx;
+    final left = (center - renderedWidth / 2)
+        .clamp(bounds.left, math.max(bounds.left, bounds.right - renderedWidth))
+        .toDouble();
+    final row = (lines ?? lyricLines(composition)).indexOf(lyric.number);
+    return Rect.fromLTWH(
+      left,
+      lyricsTop(composition) + row * 26,
+      renderedWidth,
+      text.height,
+    );
   }
 
   static Offset? tieTarget(
@@ -375,7 +401,7 @@ class ScoreLayout {
   }
 }
 
-class ScoreView extends StatelessWidget {
+class ScoreView extends StatefulWidget {
   const ScoreView({
     super.key,
     required this.composition,
@@ -391,6 +417,9 @@ class ScoreView extends StatelessWidget {
     this.cursorFollowFraction = .40,
     this.onCursorMoved,
     this.pitchTrace = const [],
+    this.onLyricChanged,
+    this.onLyricEditing,
+    this.onLyricEditingChanged,
   });
 
   final Composition composition;
@@ -407,18 +436,246 @@ class ScoreView extends StatelessWidget {
   final ValueChanged<Duration>? onCursorMoved;
   final List<PitchTracePoint> pitchTrace;
 
+  final void Function(int tick, String line, String text)? onLyricChanged;
+  final Future<bool> Function(int tick)? onLyricEditing;
+  final ValueChanged<bool>? onLyricEditingChanged;
+
+  @override
+  State<ScoreView> createState() => ScoreViewState();
+}
+
+class ScoreViewState extends State<ScoreView> {
+  final _lyricController = TextEditingController();
+  final _lyricFocus = FocusNode();
+  final _fieldKey = GlobalKey();
+  ({int tick, String line})? _editing;
+  Offset? _doubleTapPosition;
+  int _editRequest = 0;
+  bool _disposing = false;
+  final Map<({int tick, String line}), String> _committedTexts = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _lyricFocus.addListener(() {
+      if (!_disposing && !_lyricFocus.hasFocus && _editing != null) {
+        finishLyricEditing();
+      }
+    });
+  }
+
+  Composition get composition => widget.composition;
+  ScrollController? get scrollController => widget.scrollController;
+  int? get selectedEventIndex => widget.selectedEventIndex;
+  int? get selectedTick => widget.selectedTick;
+  int? get previewStartTick => widget.previewStartTick;
+  int? get previewEndTick => widget.previewEndTick;
+  Duration get playbackPosition => widget.playbackPosition;
+  bool get showPlaybackCursor => widget.showPlaybackCursor;
+  int? get practiceTargetTick => widget.practiceTargetTick;
+  ValueListenable<double>? get practiceProgress => widget.practiceProgress;
+  double get cursorFollowFraction => widget.cursorFollowFraction;
+  ValueChanged<Duration>? get onCursorMoved => widget.onCursorMoved;
+  List<PitchTracePoint> get pitchTrace => widget.pitchTrace;
+  bool get isEditingLyric => _editing != null;
+
+  ({int measure, int note})? _noteAt(int tick) {
+    for (final measure in composition.measures) {
+      final start = composition.measureStartTick(measure.index);
+      for (final (index, note) in measure.notes.indexed) {
+        if (!note.isRest &&
+            tick >= start + note.startTick &&
+            tick < start + note.startTick + note.durationTicks) {
+          // Tied notation fragments share one lyric on their source event.
+          if (note.sourceEventIndex >= 0) {
+            for (final sourceMeasure in composition.measures) {
+              for (final (sourceIndex, sourceNote)
+                  in sourceMeasure.notes.indexed) {
+                if (sourceNote.sourceEventIndex == note.sourceEventIndex) {
+                  return (measure: sourceMeasure.index, note: sourceIndex);
+                }
+              }
+            }
+          }
+          return (measure: measure.index, note: index);
+        }
+      }
+    }
+    return null;
+  }
+
+  String _textAt(int tick, String line) {
+    final committed = _committedTexts[(tick: tick, line: line)];
+    if (committed != null) return committed;
+    final target = _noteAt(tick);
+    if (target == null) return '';
+    for (final lyric
+        in composition.measures[target.measure].notes[target.note].lyrics) {
+      if (lyric.number == line) return lyric.text;
+    }
+    return '';
+  }
+
+  List<String> get _displayLines {
+    final existing = ScoreLayout.lyricLines(composition);
+    if (_editing == null) return existing;
+    final maxLine = existing.fold<int>(
+      4,
+      (value, line) => math.max(value, int.tryParse(line) ?? 1),
+    );
+    return {
+      ...[for (var line = 1; line <= maxLine; line++) '$line'],
+      ...existing,
+    }.toList();
+  }
+
+  Future<void> startLyricEditing(int tick, {String line = '1'}) async {
+    final target = _noteAt(tick);
+    if (widget.onLyricChanged == null || target == null) return;
+    tick =
+        composition.measureStartTick(target.measure) +
+        composition.measures[target.measure].notes[target.note].startTick;
+    finishLyricEditing();
+    final request = ++_editRequest;
+    final ready = await widget.onLyricEditing?.call(tick) ?? true;
+    if (!mounted ||
+        request != _editRequest ||
+        !ready ||
+        _noteAt(tick) == null) {
+      return;
+    }
+    setState(() {
+      _editing = (tick: tick, line: line);
+      final text = _textAt(tick, line);
+      _lyricController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    });
+    widget.onLyricEditingChanged?.call(true);
+    _revealField();
+  }
+
+  void _revealField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _editing == null) return;
+      _lyricFocus.requestFocus();
+      final context = _fieldKey.currentContext;
+      if (context != null) {
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 150),
+        );
+      }
+    });
+  }
+
+  void _commitLyric() {
+    final editing = _editing;
+    if (editing != null) {
+      _committedTexts[editing] = _lyricController.text;
+      widget.onLyricChanged?.call(
+        editing.tick,
+        editing.line,
+        _lyricController.text,
+      );
+    }
+  }
+
+  void finishLyricEditing({bool cancel = false}) {
+    _editRequest++;
+    if (_editing == null) return;
+    if (!cancel) _commitLyric();
+    setState(() => _editing = null);
+    _lyricFocus.unfocus();
+    widget.onLyricEditingChanged?.call(false);
+  }
+
+  void moveLyricLine(int delta) {
+    final editing = _editing;
+    if (editing == null) return;
+    final maxLine = ScoreLayout.lyricLines(
+      composition,
+    ).fold<int>(4, (value, line) => math.max(value, int.tryParse(line) ?? 1));
+    final line = ((int.tryParse(editing.line) ?? 1) + delta)
+        .clamp(1, maxLine)
+        .toString();
+    if (line == editing.line) return;
+    _commitLyric();
+    setState(() {
+      _editing = (tick: editing.tick, line: line);
+      final text = _textAt(editing.tick, line);
+      _lyricController.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    });
+    _revealField();
+  }
+
+  void _editDoubleTappedLyric() {
+    final point = _doubleTapPosition;
+    if (point == null) return;
+    for (final measure in composition.measures) {
+      for (final (index, note) in measure.notes.indexed) {
+        for (final lyric in note.lyrics) {
+          if (ScoreLayout.lyricTextBounds(
+            composition,
+            measure.index,
+            index,
+            lyric,
+            lines: _displayLines,
+          ).inflate(5).contains(point)) {
+            startLyricEditing(
+              composition.measureStartTick(measure.index) + note.startTick,
+              line: lyric.number,
+            );
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ScoreView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.composition, composition)) _committedTexts.clear();
+  }
+
+  @override
+  void dispose() {
+    _disposing = true;
+    _lyricController.dispose();
+    _lyricFocus.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final lines = _displayLines;
+    final scoreHeight = _editing == null
+        ? ScoreLayout.height(composition)
+        : math.max(
+            ScoreLayout.height(composition),
+            ScoreLayout.lyricsTop(composition) + lines.length * 26 + 32,
+          );
+    final target = _editing == null ? null : _noteAt(_editing!.tick);
+    final lyricBounds = target == null
+        ? null
+        : ScoreLayout.lyricBounds(composition, target.measure, target.note);
     final displayedMeasures = math.max(3, composition.measures.length);
     final width =
         ScoreLayout.measureLeft(composition, displayedMeasures) +
         MediaQuery.sizeOf(context).width * (1 - cursorFollowFraction);
     return SingleChildScrollView(
       child: SizedBox(
-        height: ScoreLayout.height(composition),
-        child: Scrollbar(
+        height: scoreHeight,
+        child: RawScrollbar(
           controller: scrollController,
           thumbVisibility: true,
+          // Keep the track's touch area from intercepting lyric double taps.
+          interactive: widget.onLyricChanged == null,
           child: SingleChildScrollView(
             controller: scrollController,
             scrollDirection: Axis.horizontal,
@@ -427,9 +684,15 @@ class ScoreView extends StatelessWidget {
               onTapUp: onCursorMoved == null
                   ? null
                   : (details) => _handleTap(details.localPosition),
+              onDoubleTapDown: widget.onLyricChanged == null
+                  ? null
+                  : (details) => _doubleTapPosition = details.localPosition,
+              onDoubleTap: widget.onLyricChanged == null
+                  ? null
+                  : _editDoubleTappedLyric,
               child: SizedBox(
                 width: width,
-                height: ScoreLayout.height(composition),
+                height: scoreHeight,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -442,6 +705,7 @@ class ScoreView extends StatelessWidget {
                           selectedTick: selectedTick,
                           previewStartTick: previewStartTick,
                           previewEndTick: previewEndTick,
+                          lyricLineNumbers: _editing == null ? null : lines,
                         ),
                       ),
                     ),
@@ -473,6 +737,24 @@ class ScoreView extends StatelessWidget {
                           ),
                         ),
                       ),
+                    if (_editing != null && lyricBounds != null)
+                      Positioned(
+                        left: lyricBounds.left,
+                        top:
+                            ScoreLayout.lyricsTop(composition) +
+                            lines.indexOf(_editing!.line) * 26 -
+                            7,
+                        width: math.max(220, math.min(280, lyricBounds.width)),
+                        child: InlineLyricEditor(
+                          key: _fieldKey,
+                          controller: _lyricController,
+                          focusNode: _lyricFocus,
+                          line: _editing!.line,
+                          onMoveLine: moveLyricLine,
+                          onDone: finishLyricEditing,
+                          onCancel: () => finishLyricEditing(cancel: true),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -484,6 +766,7 @@ class ScoreView extends StatelessWidget {
   }
 
   void _handleTap(Offset position) {
+    finishLyricEditing();
     final ticks = ScoreLayout.tickAtX(composition, position.dx);
     onCursorMoved?.call(ScoreLayout.durationAt(ticks, composition.tempoBpm));
   }
@@ -632,7 +915,9 @@ class ScorePainter extends CustomPainter {
     this.previewEndTick,
     this.playbackPosition = Duration.zero,
     this.showPlaybackCursor = false,
+    this.lyricLineNumbers,
   });
+  final List<String>? lyricLineNumbers;
   final Composition composition;
   final int? selectedEventIndex;
   final int? selectedTick;
@@ -818,7 +1103,7 @@ class ScorePainter extends CustomPainter {
   }
 
   void _drawLyrics(Canvas canvas) {
-    final lines = ScoreLayout.lyricLines(composition);
+    final lines = lyricLineNumbers ?? ScoreLayout.lyricLines(composition);
     final top = ScoreLayout.lyricsTop(composition);
     for (final (row, line) in lines.indexed) {
       _drawText(
@@ -1121,6 +1406,7 @@ class ScorePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ScorePainter oldDelegate) =>
+      !listEquals(oldDelegate.lyricLineNumbers, lyricLineNumbers) ||
       oldDelegate.composition != composition ||
       oldDelegate.selectedEventIndex != selectedEventIndex ||
       oldDelegate.selectedTick != selectedTick ||

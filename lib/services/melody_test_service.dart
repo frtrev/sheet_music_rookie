@@ -117,7 +117,7 @@ class MelodyTestSession {
     _attemptFrames.add(
       _AttemptFrame(
         timestampMs: frame.timestampMs,
-        frequencyHz: detectedVoice ? pitch!.frequencyHz : null,
+        frequencyHz: detectedVoice ? pitch.frequencyHz : null,
         voiceDetected: detectedVoice,
       ),
     );

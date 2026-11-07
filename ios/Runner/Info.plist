@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Sheet Music Rookie listens to your singing to create musical notation.</string>
+	<string>Sheet Music Rookie uses your microphone to detect musical notes and help create sheet music.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

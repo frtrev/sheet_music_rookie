@@ -1,0 +1,72 @@
+{
+  "verified_on": "2026-11-06",
+  "passed": true,
+  "files": [
+    {
+      "filename": "store_assets/android/tablet_7/01_main_menu.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 318724,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "f969d1e0be3497218ee9881198341a684ba6435586d16e9256486e1b387ccfef"
+    },
+    {
+      "filename": "store_assets/android/tablet_7/02_select_clef.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 198547,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "83f796e7d31aff9adc83694d5782d115f1aec897775bf1484d669bf1aa8691c1"
+    },
+    {
+      "filename": "store_assets/android/tablet_7/03_octave_range.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 235995,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "83c9d371e09b26ab766436b831686f7f43738fdee61d1a2f3ae303c758457320"
+    },
+    {
+      "filename": "store_assets/android/tablet_7/04_musical_composition.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 158680,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "8f69fd40eb43d6aa100b3fb737bbda6d0b2dcdc345bc804eb4b5b7314af4ab1f"
+    },
+    {
+      "filename": "store_assets/android/tablet_7/05_tempo_controls.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 162686,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "80252af8858ecda52540bfd786cdaffb680e9685858cded2d495b3df3e75e48e"
+    },
+    {
+      "filename": "store_assets/android/tablet_7/06_insert_note.png",
+      "actual_dimensions": "1200x1920",
+      "target_dimensions": "1200x1920",
+      "device_class": "Google Play 7-inch tablet",
+      "format": "PNG/8-bit/color-type-2",
+      "bytes": 116196,
+      "status": "PASS",
+      "reason": "",
+      "sha256": "5330389ef814e3e991290967db662e39d8582b8cb0792e1b68bf6638bf459419"
+    }
+  ]
+}
