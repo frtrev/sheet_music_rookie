@@ -1,6 +1,6 @@
 # Sheet Music Rookie release package
 
-> Source update: inline lyric editing was added after the release snapshot documented below. The existing packaged binaries and store screenshots predate that feature. Run `./scripts/prepare_store_release.sh` again before submitting the updated app.
+> Source update: inline lyric editing and the remembered tapped-note speaker toggle were added after the release snapshot documented below. The existing packaged binaries and store screenshots predate these features. Run `./scripts/prepare_store_release.sh` again before submitting the updated app.
 
 Prepared 6 November 2026. Version remains **1.0.0+1**. Do not upload a build number already used in either portal; set the next number in pubspec.yaml or pass Flutter build flags. Bundle identifiers and Apple signing team are preserved.
 

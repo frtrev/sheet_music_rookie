@@ -22,6 +22,7 @@ import '../services/metronome_service.dart';
 import '../services/practice_service.dart';
 import '../services/screen_awake_service.dart';
 import '../services/score_playback_service.dart';
+import '../services/settings_service.dart';
 import '../transcription/transcription_engine.dart';
 import '../widgets/live_pitch_monitor.dart';
 import '../widgets/practice_pitch_gauge.dart';
@@ -57,6 +58,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   final CompositionStorageService _storage = CompositionStorageService();
   final GlobalKey<ScoreViewState> _scoreViewKey = GlobalKey<ScoreViewState>();
   bool _lyricEditing = false;
+  final SettingsService _settings = SettingsService();
+  bool _noteTapPlayback = true;
+  bool _noteTapPreferenceChanged = false;
   final ScrollController _scoreScroll = ScrollController();
   final ScrollController _pageScroll = ScrollController();
   bool _pausedByUser = true;
@@ -102,6 +106,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _engine.latestAudioFrame.addListener(_practiceFrameChanged);
     _engine.phraseDraft.addListener(_phraseChanged);
     unawaited(_engine.initialize());
+    unawaited(_loadNoteTapPlayback());
   }
 
   void _microphoneStatusChanged() {
@@ -745,6 +750,46 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     return true;
   }
 
+  Future<void> _loadNoteTapPlayback() async {
+    final enabled = await _settings.loadNoteTapPlayback();
+    if (!mounted || _noteTapPreferenceChanged) return;
+    setState(() => _noteTapPlayback = enabled);
+  }
+
+  Future<void> _toggleNoteTapPlayback() async {
+    _noteTapPreferenceChanged = true;
+    final enabled = !_noteTapPlayback;
+    setState(() => _noteTapPlayback = enabled);
+    await Future.wait([
+      _settings.saveNoteTapPlayback(enabled),
+      if (!enabled) _notePreview.stop(resetPosition: true),
+    ]);
+  }
+
+  Future<void> _previewNoteAtTick(int tick) async {
+    if (!_noteTapPlayback || _playback.isPlaying.value) return;
+    final composition = _engine.composition.value;
+    for (final measure in composition.measures) {
+      final start = composition.measureStartTick(measure.index);
+      for (final note in measure.notes) {
+        if (tick >= start + note.startTick &&
+            tick < start + note.startTick + note.durationTicks) {
+          if (note.isRest) return;
+          await _playEditedPreview(
+            midiPitch: playbackMidiPitch(
+              composition,
+              note.midiPitch,
+              accidental: note.accidental,
+            ),
+            durationTicks: note.durationTicks,
+            isRest: false,
+          );
+          return;
+        }
+      }
+    }
+  }
+
   Future<void> _movePlaybackCursor(Duration position) async {
     if (_resolvePhraseFirst()) return;
     await _notePreview.stop(resetPosition: true);
@@ -768,6 +813,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         _engine.notationCursorTick.value = tick;
       }
       await _playback.seekScore(position, _engine.composition.value.tempoBpm);
+      if (mounted && !recording) await _previewNoteAtTick(tick);
     } finally {
       _manualCursorMoveInProgress = false;
     }
@@ -1491,7 +1537,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     await _notePreview.play(
       Composition(
         clef: composition.clef,
-        keySignature: composition.keySignature,
+        // Preview pitches are already converted to sounding MIDI.
+        keySignature: KeySignature.cMajor,
         tempoBpm: composition.tempoBpm,
         playbackVolume: composition.playbackVolume,
         playbackInstrument: composition.playbackInstrument,
@@ -1778,6 +1825,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 builder: (context, _, _) => ValueListenableBuilder<int>(
                   valueListenable: _engine.notationCursorTick,
                   builder: (context, cursorTick, _) => _NoteEditControls(
+                    noteTapPlayback: _noteTapPlayback,
+                    onToggleNoteTapPlayback: () =>
+                        unawaited(_toggleNoteTapPlayback()),
                     lyricEditing: _lyricEditing,
                     onEditLyrics: _editLyrics,
                     canUndo: !_historyBusy && _engine.canUndo,
@@ -2155,6 +2205,8 @@ class _TransportButton extends StatelessWidget {
 
 class _NoteEditControls extends StatelessWidget {
   const _NoteEditControls({
+    required this.noteTapPlayback,
+    required this.onToggleNoteTapPlayback,
     required this.lyricEditing,
     required this.onEditLyrics,
     required this.canUndo,
@@ -2177,6 +2229,8 @@ class _NoteEditControls extends StatelessWidget {
     required this.onInsertMeasure,
   });
 
+  final bool noteTapPlayback;
+  final VoidCallback onToggleNoteTapPlayback;
   final bool lyricEditing;
   final VoidCallback onEditLyrics;
   final bool canUndo;
@@ -2258,6 +2312,11 @@ class _NoteEditControls extends StatelessWidget {
                 Icons.lyrics_outlined,
                 'Edit lyrics',
                 hasEvent && !isRest ? onEditLyrics : null,
+              ),
+              _tool(
+                noteTapPlayback ? Icons.volume_up : Icons.volume_off,
+                noteTapPlayback ? 'Mute tapped notes' : 'Play tapped notes',
+                onToggleNoteTapPlayback,
               ),
               _tool(
                 isTied ? Icons.link_off : Icons.link,

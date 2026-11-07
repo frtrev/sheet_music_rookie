@@ -6,6 +6,20 @@ import 'package:sheet_music_rookie/services/settings_service.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test(
+    'tapped-note playback defaults on and remembers both toggle states',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      expect(await SettingsService().loadNoteTapPlayback(), isTrue);
+      await SettingsService().saveNoteTapPlayback(false);
+      expect(await SettingsService().loadNoteTapPlayback(), isFalse);
+      await SettingsService().save(const VoiceDetectionSettings());
+      expect(await SettingsService().loadNoteTapPlayback(), isFalse);
+      await SettingsService().saveNoteTapPlayback(true);
+      expect(await SettingsService().loadNoteTapPlayback(), isTrue);
+    },
+  );
+
   test('practice difficulty persists with voice settings', () async {
     SharedPreferences.setMockInitialValues({});
     final service = SettingsService();

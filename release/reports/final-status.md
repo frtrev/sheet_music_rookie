@@ -1,6 +1,6 @@
 # Final release preparation status — 6 November 2026
 
-> Subsequent source update: the app now has inline lyric editing. The binaries/screenshots and results below describe the earlier release snapshot; regenerate the release package for the updated app.
+> Subsequent source update: the app now has inline lyric editing and a remembered tapped-note speaker toggle. The binaries/screenshots and results below describe the earlier release snapshot; regenerate the release package for the updated app.
 
 The release package is prepared locally. **Android submission remains blocked by the missing registered upload key.** Physical audio/permission checks, owner declarations, website publication and portal submission remain manual gates. No upload, store questionnaire submission, Git commit/push or website deployment was performed.
 

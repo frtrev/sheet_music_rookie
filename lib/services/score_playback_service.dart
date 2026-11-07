@@ -26,6 +26,7 @@ class ScorePlaybackService {
   }
 
   PerformancePlan? _plan;
+  int _requestId = 0;
   final AudioPlayer _player;
 
   int scoreTickAt(Duration elapsed, int tempoBpm) {
@@ -53,6 +54,7 @@ class ScorePlaybackService {
     Composition composition, {
     Duration startAt = Duration.zero,
   }) async {
+    final request = ++_requestId;
     final plan = PerformancePlan(composition);
     final performedTick = plan.performanceTickAt(
       (startAt.inMicroseconds * composition.tempoBpm * 480 / 60000000).round(),
@@ -62,30 +64,38 @@ class ScorePlaybackService {
           .round(),
     );
     final bank = await GeneralUserSoundFont.load();
+    if (request != _requestId) return false;
     final bytes = await compute(_renderPianoWave, (
       composition: plan.expanded,
       soundFont: bank,
     ));
+    if (request != _requestId || bytes == null) return false;
     _plan = plan;
-    if (bytes == null) return false;
     await _player.stop();
+    if (request != _requestId) return false;
     position.value = startAt;
     await _player.setReleaseMode(ReleaseMode.stop);
+    if (request != _requestId) return false;
     await _player.play(
       BytesSource(bytes, mimeType: 'audio/wav'),
       position: startAt > Duration.zero ? startAt : null,
     );
+    if (request != _requestId) return false;
     isPlaying.value = true;
     return true;
   }
 
   Future<bool> playWave(Uint8List bytes) async {
+    final request = ++_requestId;
     if (bytes.isEmpty) return false;
     _plan = null;
     await _player.stop();
+    if (request != _requestId) return false;
     position.value = Duration.zero;
     await _player.setReleaseMode(ReleaseMode.stop);
+    if (request != _requestId) return false;
     await _player.play(BytesSource(bytes, mimeType: 'audio/wav'));
+    if (request != _requestId) return false;
     isPlaying.value = true;
     return true;
   }
@@ -96,6 +106,7 @@ class ScorePlaybackService {
   }
 
   Future<void> stop({bool resetPosition = false}) async {
+    _requestId++;
     // Mark playback stopped before the platform call. Some native players emit
     // a final zero-position event from stop(), which must not look like a seek.
     isPlaying.value = false;
@@ -104,6 +115,7 @@ class ScorePlaybackService {
   }
 
   Future<void> dispose() async {
+    _requestId++;
     await _completionSubscription.cancel();
     await _positionSubscription.cancel();
     await _player.dispose();

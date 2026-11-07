@@ -5,6 +5,16 @@ import '../models/voice_detection_settings.dart';
 class SettingsService {
   static const _prefix = 'voice.';
 
+  Future<bool> loadNoteTapPlayback() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('editor.noteTapPlayback') ?? true;
+  }
+
+  Future<void> saveNoteTapPlayback(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('editor.noteTapPlayback', enabled);
+  }
+
   Future<VoiceDetectionSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
     const defaults = VoiceDetectionSettings();
