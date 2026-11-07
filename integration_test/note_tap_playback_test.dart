@@ -49,7 +49,7 @@ void main() {
     app.main();
     await tester.pumpAndSettle();
     Future<void> open() async {
-      await tester.tap(find.text('Open'));
+      await tester.tap(find.text('Sheets'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Tapped Note Playback Check'));
       await tester.pumpAndSettle();

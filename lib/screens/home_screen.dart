@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app/app_theme.dart';
 import '../models/composition.dart';
 import '../services/composition_storage_service.dart';
+import '../widgets/saved_sheets_dialog.dart';
 import 'score_editor_screen.dart';
 import 'settings_screen.dart';
 
@@ -130,7 +131,7 @@ class HomeScreen extends StatelessWidget {
                           OutlinedButton.icon(
                             onPressed: () => _openSaved(context),
                             icon: const Icon(Icons.folder_open_rounded),
-                            label: const Text('Open'),
+                            label: const Text('Sheets'),
                           ),
                           const SizedBox(height: 8),
                           TextButton.icon(
@@ -229,60 +230,19 @@ class HomeScreen extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Saved compositions could not be read.'),
+            content: Text('Saved sheets could not be read.'),
           ),
         );
       }
       return;
     }
     if (!context.mounted) return;
-    if (saved.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No saved compositions yet.')),
-      );
-      return;
-    }
     final selected = await showDialog<SavedComposition>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Open composition'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.separated(
-            shrinkWrap: true,
-            itemCount: saved.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (context, index) {
-              final item = saved[index];
-              final date = item.modifiedAt.toLocal();
-              final dateLabel =
-                  '${date.month}/${date.day}/${date.year} '
-                  '${date.hour.toString().padLeft(2, '0')}:'
-                  '${date.minute.toString().padLeft(2, '0')}';
-              return ListTile(
-                leading: const Icon(Icons.music_note),
-                title: Text(item.composition.title),
-                subtitle: Text(
-                  '${item.composition.keySignature.name} • $dateLabel',
-                ),
-                trailing: Builder(
-                  builder: (shareContext) => IconButton(
-                    onPressed: () => _shareSaved(shareContext, item),
-                    icon: const Icon(Icons.ios_share_rounded),
-                    tooltip: 'Share ${item.composition.title}',
-                  ),
-                ),
-                onTap: () => Navigator.pop(context, item),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
+      builder: (_) => SavedSheetsDialog(
+        sheets: saved,
+        storage: service,
+        onShare: _shareSaved,
       ),
     );
     if (selected == null || !context.mounted) return;
@@ -318,7 +278,7 @@ class HomeScreen extends StatelessWidget {
     } on Object {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The composition could not be shared.')),
+          const SnackBar(content: Text('The sheet could not be shared.')),
         );
       }
     }

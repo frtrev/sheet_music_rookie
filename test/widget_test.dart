@@ -10,7 +10,7 @@ void main() {
 
     expect(find.text('Sheet Music Rookie'), findsOneWidget);
     expect(find.text('Create'), findsOneWidget);
-    expect(find.text('Open'), findsOneWidget);
+    expect(find.text('Sheets'), findsOneWidget);
     expect(find.text('Settings'), findsOneWidget);
 
     await tester.tap(find.text('Create'));

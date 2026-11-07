@@ -21,7 +21,7 @@ Use **Practice** to rehearse without changing the composition. Practice starts a
 
 Saved compositions have a share action in the **Open composition** list. It exports the compressed MusicXML (`.mxl`) file through the system share sheet, including Save to Files and Google Drive when available.
 
-Use the save button in the editor to name and store a composition locally. Scores are saved in the app's documents directory as compressed MusicXML (`.mxl`) archives, with a standard MusicXML 4.0 score plus private round-trip metadata for the editor. The **Open** button on the home screen lists saved scores and restores their notation and editable recording events. No cloud service or account is involved.
+Use the save button in the editor to name and store a composition locally. Scores are saved in the app's documents directory as compressed MusicXML (`.mxl`) archives, with a standard MusicXML 4.0 score plus private round-trip metadata for the editor. The **Sheets** button on the home screen lists saved scores. Tap a title to restore its notation and editable recording events, or use its play/stop, share, and remove buttons. Only one sheet plays at a time; closing the list or opening a sheet stops preview playback. No cloud service or account is involved.
 
 The installed mobile app also registers as a MusicXML document editor. From Files or another file manager, use **Open With** or **Share** and choose Sheet Music Rookie to import `.mxl`, `.musicxml`, or legacy `.xml` scores. App-authored MXL files retain all editor metadata; third-party partwise MusicXML imports the primary voice with its title, tempo, meter, key, clef, notes, rests, accidentals, and ties.
 

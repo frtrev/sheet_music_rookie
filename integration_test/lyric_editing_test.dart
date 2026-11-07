@@ -45,7 +45,7 @@ void main() {
     );
     app.main();
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Open'));
+    await tester.tap(find.text('Sheets'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lyric Editing Check'));
     await tester.pumpAndSettle();
@@ -112,7 +112,7 @@ void main() {
     );
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Open'));
+    await tester.tap(find.text('Sheets'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Lyric Editing Check'));
     await tester.pumpAndSettle();

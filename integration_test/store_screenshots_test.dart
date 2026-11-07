@@ -88,7 +88,7 @@ void main() {
     expect(find.byTooltip('Insert Note'), findsOneWidget);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Open'));
+    await tester.tap(find.text('Sheets'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Morning Melody').first);
     await capture('04_musical_composition');

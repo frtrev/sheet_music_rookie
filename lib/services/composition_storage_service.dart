@@ -78,6 +78,10 @@ class CompositionStorageService {
     );
   }
 
+  Future<void> removeSaved(SavedComposition item) async {
+    await File(item.path).delete();
+  }
+
   Future<List<SavedComposition>> listSaved() async {
     final directory = await _storageDirectory();
     final saved = <SavedComposition>[];
