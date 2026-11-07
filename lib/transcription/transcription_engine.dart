@@ -13,6 +13,7 @@ import '../audio/pitch_detector.dart';
 import '../audio/pitch_smoother.dart';
 import '../models/composition.dart';
 import '../models/measure.dart';
+import '../models/measure_marks.dart';
 import '../models/musical_note.dart';
 import '../models/note_lyric.dart';
 import '../models/pitch_detection_result.dart';
@@ -761,6 +762,30 @@ class TranscriptionEngine {
     }
     return null;
   }
+
+  /// Changes only the selected measure and records one undoable edit.
+  void editMeasureMarkAtTick(
+    int tick, {
+    required MeasureEdge edge,
+    bool volta = false,
+  }) => _edit(() {
+    if (isPunchingIn) _finishPunchIn();
+    final current = composition.value;
+    if (current.measures.isEmpty) return;
+    final index = current.measureIndexAtTick(tick);
+    final measure = current.measures[index];
+    final marks = MeasureMarks(measure.barlines);
+    final measures = [...current.measures];
+    measures[index] = Measure(
+      index: measure.index,
+      notes: measure.notes,
+      beatsPerMeasure: measure.beatsPerMeasure,
+      beatUnit: measure.beatUnit,
+      timeSignatureExplicit: measure.timeSignatureExplicit,
+      barlines: volta ? marks.cycleVolta(edge) : marks.toggleRepeat(edge),
+    );
+    composition.value = current.copyWith(measures: measures);
+  });
 
   /// One history entry per completed lyric edit, including verse deletion.
   void setLyricAtTick(int tick, String line, String text) {

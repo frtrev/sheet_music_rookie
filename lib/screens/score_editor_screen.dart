@@ -11,6 +11,8 @@ import '../models/composition.dart';
 import '../models/phrase_draft.dart';
 import '../widgets/phrase_review_panel.dart';
 import '../models/measure.dart';
+import '../models/measure_marks.dart';
+import '../widgets/measure_mark_icon.dart';
 import '../models/musical_note.dart';
 import '../models/raw_note_event.dart';
 import '../models/voice_detection_settings.dart';
@@ -1398,6 +1400,20 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     }
   }
 
+  Future<void> _editMeasureMark(MeasureEdge edge, bool volta) async {
+    _scoreViewKey.currentState?.finishLyricEditing();
+    if (_resolvePhraseFirst()) return;
+    final tick = _engine.notationCursorTick.value;
+    if (_testActive) await _stopTest(showResults: false);
+    if (_practiceActive) await _stopPractice();
+    await _notePreview.stop(resetPosition: true);
+    await _stopPlayback(resumeListening: false);
+    _pausedByUser = true;
+    await _pauseRecording();
+    if (!mounted) return;
+    _engine.editMeasureMarkAtTick(tick, edge: edge, volta: volta);
+  }
+
   Future<bool> _prepareLyricEditing(int tick) async {
     if (_resolvePhraseFirst()) return false;
     if (_testActive) await _stopTest(showResults: false);
@@ -1822,49 +1838,58 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               valueListenable: _engine.historyRevision,
               builder: (context, _, _) => ValueListenableBuilder<Composition>(
                 valueListenable: _engine.composition,
-                builder: (context, _, _) => ValueListenableBuilder<int>(
-                  valueListenable: _engine.notationCursorTick,
-                  builder: (context, cursorTick, _) => _NoteEditControls(
-                    noteTapPlayback: _noteTapPlayback,
-                    onToggleNoteTapPlayback: () =>
-                        unawaited(_toggleNoteTapPlayback()),
-                    lyricEditing: _lyricEditing,
-                    onEditLyrics: _editLyrics,
-                    canUndo: !_historyBusy && _engine.canUndo,
-                    canRedo: !_historyBusy && _engine.canRedo,
-                    onUndo: () => unawaited(_changeHistory(redo: false)),
-                    onRedo: () => unawaited(_changeHistory(redo: true)),
-                    hasEvent: _engine.eventIndexAtTick(cursorTick) != null,
-                    isRest: _engine.isRestAtTick(cursorTick),
-                    canToggleRest: _engine.canToggleRestAtTick(cursorTick),
-                    canToggleTie: _engine.canToggleTieAtTick(cursorTick),
-                    isTied: _engine.isTiedAtTick(cursorTick),
-                    onPitchUp: () {
-                      if (_scoreViewKey.currentState?.isEditingLyric ?? false) {
-                        _scoreViewKey.currentState!.moveLyricLine(-1);
-                      } else {
-                        unawaited(_editSelectedNote(pitchDelta: 1));
-                      }
-                    },
-                    onPitchDown: () {
-                      if (_scoreViewKey.currentState?.isEditingLyric ?? false) {
-                        _scoreViewKey.currentState!.moveLyricLine(1);
-                      } else {
-                        unawaited(_editSelectedNote(pitchDelta: -1));
-                      }
-                    },
-                    onShorter: () =>
-                        unawaited(_editSelectedNote(durationDelta: -1)),
-                    onLonger: () =>
-                        unawaited(_editSelectedNote(durationDelta: 1)),
-                    onToggleNote: () =>
-                        unawaited(_toggleSelectedRest(insertNote: true)),
-                    onToggleRest: () => unawaited(_toggleSelectedRest()),
-                    onToggleTie: () => unawaited(_toggleSelectedTie()),
-                    onRemove: () => unawaited(_removeSelectedNote()),
-                    onInsertMeasure: () => unawaited(_insertMeasure()),
-                  ),
-                ),
+                builder: (context, composition, _) =>
+                    ValueListenableBuilder<int>(
+                      valueListenable: _engine.notationCursorTick,
+                      builder: (context, cursorTick, _) => _NoteEditControls(
+                        selectedMeasure: composition.measures.isEmpty
+                            ? null
+                            : composition.measures[composition
+                                  .measureIndexAtTick(cursorTick)],
+                        onEditMeasureMark: (edge, volta) =>
+                            unawaited(_editMeasureMark(edge, volta)),
+                        noteTapPlayback: _noteTapPlayback,
+                        onToggleNoteTapPlayback: () =>
+                            unawaited(_toggleNoteTapPlayback()),
+                        lyricEditing: _lyricEditing,
+                        onEditLyrics: _editLyrics,
+                        canUndo: !_historyBusy && _engine.canUndo,
+                        canRedo: !_historyBusy && _engine.canRedo,
+                        onUndo: () => unawaited(_changeHistory(redo: false)),
+                        onRedo: () => unawaited(_changeHistory(redo: true)),
+                        hasEvent: _engine.eventIndexAtTick(cursorTick) != null,
+                        isRest: _engine.isRestAtTick(cursorTick),
+                        canToggleRest: _engine.canToggleRestAtTick(cursorTick),
+                        canToggleTie: _engine.canToggleTieAtTick(cursorTick),
+                        isTied: _engine.isTiedAtTick(cursorTick),
+                        onPitchUp: () {
+                          if (_scoreViewKey.currentState?.isEditingLyric ??
+                              false) {
+                            _scoreViewKey.currentState!.moveLyricLine(-1);
+                          } else {
+                            unawaited(_editSelectedNote(pitchDelta: 1));
+                          }
+                        },
+                        onPitchDown: () {
+                          if (_scoreViewKey.currentState?.isEditingLyric ??
+                              false) {
+                            _scoreViewKey.currentState!.moveLyricLine(1);
+                          } else {
+                            unawaited(_editSelectedNote(pitchDelta: -1));
+                          }
+                        },
+                        onShorter: () =>
+                            unawaited(_editSelectedNote(durationDelta: -1)),
+                        onLonger: () =>
+                            unawaited(_editSelectedNote(durationDelta: 1)),
+                        onToggleNote: () =>
+                            unawaited(_toggleSelectedRest(insertNote: true)),
+                        onToggleRest: () => unawaited(_toggleSelectedRest()),
+                        onToggleTie: () => unawaited(_toggleSelectedTie()),
+                        onRemove: () => unawaited(_removeSelectedNote()),
+                        onInsertMeasure: () => unawaited(_insertMeasure()),
+                      ),
+                    ),
               ),
             ),
             const SizedBox(height: 10),
@@ -2205,6 +2230,8 @@ class _TransportButton extends StatelessWidget {
 
 class _NoteEditControls extends StatelessWidget {
   const _NoteEditControls({
+    required this.selectedMeasure,
+    required this.onEditMeasureMark,
     required this.noteTapPlayback,
     required this.onToggleNoteTapPlayback,
     required this.lyricEditing,
@@ -2229,6 +2256,8 @@ class _NoteEditControls extends StatelessWidget {
     required this.onInsertMeasure,
   });
 
+  final Measure? selectedMeasure;
+  final void Function(MeasureEdge edge, bool volta) onEditMeasureMark;
   final bool noteTapPlayback;
   final VoidCallback onToggleNoteTapPlayback;
   final bool lyricEditing;
@@ -2338,10 +2367,52 @@ class _NoteEditControls extends StatelessWidget {
               ),
             ],
           ),
+          const Divider(height: 8),
+          Row(
+            children: [
+              _measureTool(context, MeasureEdge.left),
+              _measureTool(context, MeasureEdge.right),
+              _measureTool(context, MeasureEdge.left, volta: true),
+              _measureTool(context, MeasureEdge.right, volta: true),
+            ],
+          ),
         ],
       ),
     ),
   );
+
+  Widget _measureTool(
+    BuildContext context,
+    MeasureEdge edge, {
+    bool volta = false,
+  }) {
+    final marks = MeasureMarks(selectedMeasure?.barlines ?? const []);
+    final number = marks.voltaNumber(edge);
+    final active = volta ? number != null : marks.hasRepeat(edge);
+    final colors = Theme.of(context).colorScheme;
+    return Expanded(
+      child: IconButton(
+        key: ValueKey('${edge.name}-${volta ? 'volta' : 'repeat'}'),
+        tooltip: volta
+            ? '${edge == MeasureEdge.left ? 'Left' : 'Right'} volta: ${number ?? 'none'} (cycle 1, 2, 3, none)'
+            : 'Toggle ${edge.name} repeat',
+        isSelected: active,
+        onPressed: selectedMeasure == null
+            ? null
+            : () => onEditMeasureMark(edge, volta),
+        icon: MeasureMarkIcon(
+          edge: edge,
+          volta: volta,
+          number: number,
+          color: selectedMeasure == null
+              ? colors.onSurface.withValues(alpha: .38)
+              : active
+              ? colors.primary
+              : colors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 
   Widget _tool(
     IconData icon,
