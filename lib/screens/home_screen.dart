@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -72,9 +74,19 @@ class HomeScreen extends StatelessWidget {
                               letterSpacing: -1,
                             ),
                           ),
+                          if (context.l10n.localeName == 'es') ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              context.l10n.welcomeSpanish,
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.muted,
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           Text(
-                            'Sing it. See it. Shape it.',
+                            context.l10n.singItSeeItShapeIt,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.titleMedium?.copyWith(
                               color: AppTheme.muted,
@@ -97,15 +109,17 @@ class HomeScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
-                                  'Your voice. Your music.',
+                                  context.l10n.yourVoiceYourMusic,
                                   style: theme.textTheme.titleLarge?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                const Text(
-                                  'Turn a melody into sheet music, one note at a time.',
+                                Text(
+                                  context
+                                      .l10n
+                                      .turnAMelodyIntoSheetMusicOneNoteAtATime,
                                   style: TextStyle(
                                     color: Colors.white,
                                     height: 1.5,
@@ -121,7 +135,7 @@ class HomeScreen extends StatelessWidget {
                                       foregroundColor: AppTheme.blue,
                                     ),
                                     icon: const Icon(Icons.add_rounded),
-                                    label: const Text('Create'),
+                                    label: Text(context.l10n.create),
                                   ),
                                 ),
                               ],
@@ -131,7 +145,7 @@ class HomeScreen extends StatelessWidget {
                           OutlinedButton.icon(
                             onPressed: () => _openSaved(context),
                             icon: const Icon(Icons.folder_open_rounded),
-                            label: const Text('Sheets'),
+                            label: Text(context.l10n.sheets),
                           ),
                           const SizedBox(height: 8),
                           TextButton.icon(
@@ -142,11 +156,11 @@ class HomeScreen extends StatelessWidget {
                               ),
                             ),
                             icon: const Icon(Icons.tune_rounded),
-                            label: const Text('Settings'),
+                            label: Text(context.l10n.settings),
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'Offline • No account required',
+                            context.l10n.offlineNoAccountRequired,
                             textAlign: TextAlign.center,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppTheme.muted,
@@ -177,7 +191,7 @@ class HomeScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Choose a clef',
+                  context.l10n.chooseAClef,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 18),
@@ -190,8 +204,11 @@ class HomeScreen extends StatelessWidget {
                         Expanded(
                           child: _ClefButton(
                             symbol: ClefType.values[row * 2 + column].symbol,
-                            label:
-                                '${ClefType.values[row * 2 + column].label} Clef',
+                            label: context.l10n.clefName(
+                              context.l10n.label(
+                                ClefType.values[row * 2 + column].label,
+                              ),
+                            ),
                             onTap: () => Navigator.pop(
                               context,
                               ClefType.values[row * 2 + column],
@@ -229,9 +246,7 @@ class HomeScreen extends StatelessWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Saved sheets could not be read.'),
-          ),
+          SnackBar(content: Text(context.l10n.savedSheetsCouldNotBeRead)),
         );
       }
       return;
@@ -278,7 +293,7 @@ class HomeScreen extends StatelessWidget {
     } on Object {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The sheet could not be shared.')),
+          SnackBar(content: Text(context.l10n.theSheetCouldNotBeShared)),
         );
       }
     }
@@ -298,13 +313,13 @@ class HomeScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  'Choose an octave range',
+                  context.l10n.chooseAnOctaveRange,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 6),
-                const Text(
-                  'Detected notes will be written and played in this range.',
+                Text(
+                  context.l10n.detectedNotesWillBeWrittenAndPlayedInThisRange,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -320,8 +335,8 @@ class HomeScreen extends StatelessWidget {
                               ),
                       ),
                     ),
-                    title: Text(range.label),
-                    subtitle: Text(_rangeDescription(range)),
+                    title: Text(context.l10n.label(range.label)),
+                    subtitle: Text(_rangeDescription(context, range)),
                     onTap: () => Navigator.pop(context, range),
                   ),
               ],
@@ -332,12 +347,17 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  String _rangeDescription(OctaveRange range) => switch (range) {
-    OctaveRange.twoOctavesDown => 'Write two octaves below the detected pitch',
-    OctaveRange.octaveDown => 'Write one octave below the detected pitch',
-    OctaveRange.standard => 'Write at the detected pitch',
-    OctaveRange.octaveUp => 'Write one octave above the detected pitch',
-    OctaveRange.twoOctavesUp => 'Write two octaves above the detected pitch',
+  String _rangeDescription(
+    BuildContext context,
+    OctaveRange range,
+  ) => switch (range) {
+    OctaveRange.twoOctavesDown =>
+      context.l10n.writeTwoOctavesBelowTheDetectedPitch,
+    OctaveRange.octaveDown => context.l10n.writeOneOctaveBelowTheDetectedPitch,
+    OctaveRange.standard => context.l10n.writeAtTheDetectedPitch,
+    OctaveRange.octaveUp => context.l10n.writeOneOctaveAboveTheDetectedPitch,
+    OctaveRange.twoOctavesUp =>
+      context.l10n.writeTwoOctavesAboveTheDetectedPitch,
   };
 }
 

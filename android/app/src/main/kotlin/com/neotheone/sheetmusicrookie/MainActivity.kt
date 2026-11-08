@@ -1,4 +1,4 @@
-package com.sheetmusicrookie.sheet_music_rookie
+package com.neotheone.sheetmusicrookie
 
 import android.content.Intent
 import android.database.Cursor

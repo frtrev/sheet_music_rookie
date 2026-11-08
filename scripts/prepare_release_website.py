@@ -36,7 +36,7 @@ support='''<h1>Sheet Music Rookie Support</h1><p>Turn a melody into sheet music,
 <h2>Contact</h2><p>Email <a href="mailto:ftrevino@yahoo.com?subject=Sheet%20Music%20Rookie%20Support">ftrevino@yahoo.com</a> with your app version, device model, OS version, and steps to reproduce the issue. Include screenshots only after removing private information.</p>'''
 page('sheet-music-rookie/support','Support',support)
 shots=''
-for name,label in [('01_main_menu','Create or open a composition'),('04_musical_composition','Edit a local sample melody'),('06_insert_note','Insert musical notes')]:
+for name,label in [('01_main_menu','Create or open a composition'),('04_musical_composition','Edit a local sample melody'),('06_note_editing','Edit notes and measure marks')]:
     source=root/'store_assets/android/phone'/f'{name}.png'
     if source.exists():
         shutil.copy2(source,assets/source.name)

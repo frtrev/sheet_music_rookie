@@ -4,7 +4,7 @@
     "apple": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/",
     "google": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en"
   },
-  "screens": ["01_main_menu", "02_select_clef", "03_octave_range", "04_musical_composition", "05_tempo_controls", "06_insert_note"],
+  "screens": ["01_main_menu", "02_select_clef", "03_octave_range", "04_musical_composition", "05_tempo_controls", "06_note_editing"],
   "groups": {
     "iphone_other_required": {"path":"ios/iphone_other_required", "size":[1206,2622], "min":6, "max":10, "device":"iPhone 17 Pro", "category":"iPhone with Dynamic Island (medium display)", "required":true},
     "iphone_large": {"path":"ios/iphone_large", "size":[1320,2868], "min":6, "max":10, "device":"iPhone 17 Pro Max", "category":"iPhone with Dynamic Island (large display)", "required":true},

@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -44,7 +46,7 @@ class InlineLyricEditor extends StatelessWidget {
                 textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Line $line',
+                  hintText: context.l10n.lyricLine(line),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 4,
                     vertical: 7,
@@ -57,15 +59,15 @@ class InlineLyricEditor extends StatelessWidget {
             ),
             _arrow(
               Icons.arrow_upward,
-              'Previous lyric line',
+              context.l10n.previousLyricLine,
               () => onMoveLine(-1),
             ),
             _arrow(
               Icons.arrow_downward,
-              'Next lyric line',
+              context.l10n.nextLyricLine,
               () => onMoveLine(1),
             ),
-            _arrow(Icons.check, 'Finish lyric editing', onDone),
+            _arrow(Icons.check, context.l10n.finishLyricEditing, onDone),
           ],
         ),
       ),

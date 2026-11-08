@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -125,11 +127,17 @@ class _PitchGauge extends StatelessWidget {
     final color =
         reading?.colorForTolerance(toleranceCents) ?? scheme.outlineVariant;
     final semantics = !active
-        ? 'Pitch gauge inactive'
+        ? context.l10n.pitchGaugeInactive
         : reading == null
-        ? 'Pitch gauge waiting for a tone'
-        : 'Pitch ${reading!.description}; acceptable within plus or minus '
-              '${toleranceCents.round()} cents';
+        ? context.l10n.pitchGaugeWaitingForATone
+        : context.l10n.pitchGaugeReading(
+            reading!.errorCents.round().abs() <= 2
+                ? context.l10n.onPitch
+                : reading!.errorCents > 0
+                ? context.l10n.sharpCents(reading!.errorCents.round().abs())
+                : context.l10n.flatCents(reading!.errorCents.round().abs()),
+            toleranceCents.round(),
+          );
 
     return Semantics(
       label: semantics,

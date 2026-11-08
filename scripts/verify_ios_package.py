@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory(prefix='smr-ipa-verify-') as temp:
     subprocess.run(['codesign','--verify','--deep','--strict',str(app)],check=True,capture_output=True)
     profile=plistlib.loads(subprocess.run(['security','cms','-D','-i',str(app/'embedded.mobileprovision')],check=True,capture_output=True).stdout)
     entitlements=profile['Entitlements'];team=entitlements.get('com.apple.developer.team-identifier')
-    assert info['CFBundleIdentifier']=='com.sheetmusicrookie.sheetMusicRookie'
+    assert info['CFBundleIdentifier']=='com.neotheone.sheetmusicrookie'
     assert info['CFBundleDisplayName']=='Sheet Music Rookie'
     version=re.search(r'^version:\s*([^\s]+)',(root/'pubspec.yaml').read_text(),re.M).group(1)
     name,build=version.split('+')

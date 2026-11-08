@@ -1,0 +1,11 @@
+{
+  "verified_at_utc": "2026-11-07T17:36:52.571019+00:00",
+  "bundle_id": "com.neotheone.sheetmusicrookie",
+  "apple_team": "C2M32YF6V7",
+  "matching_apple_provisioning_profile": true,
+  "app_store_distribution_profile": true,
+  "signature_verified": true,
+  "ipa": "build/ios/ipa/sheet_music_rookie.ipa",
+  "sha256": "a3f441b0518a84173f885d3fc96c01cee5dd56c5a5706f92986fe400509aad91",
+  "uploaded": false
+}

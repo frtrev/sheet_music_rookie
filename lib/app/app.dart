@@ -1,5 +1,12 @@
 import 'dart:async';
 
+import '../l10n/l10n.dart';
+import '../l10n/language_scope.dart';
+import '../models/app_language.dart';
+import '../services/settings_service.dart';
+
+import 'package:flutter_localizations/flutter_localizations.dart';
+
 import 'app_theme.dart';
 
 import 'package:flutter/material.dart';
@@ -24,12 +31,31 @@ class _SheetMusicRookieAppState extends State<SheetMusicRookieApp> {
   final List<String> _pendingFiles = [];
   StreamSubscription<String>? _fileSubscription;
   bool _openingFile = false;
+  final SettingsService _settings = SettingsService();
+  AppLanguage _language = AppLanguage.system;
+  bool _languageChanged = false;
 
   @override
   void initState() {
     super.initState();
     _fileSubscription = _incomingFiles.files.listen(_queueFile);
     unawaited(_incomingFiles.initialize());
+    unawaited(_loadLanguage());
+  }
+
+  Future<void> _loadLanguage() async {
+    try {
+      final language = await _settings.loadAppLanguage();
+      if (mounted && !_languageChanged) setState(() => _language = language);
+    } catch (_) {
+      // Device language remains the default when preferences are unavailable.
+    }
+  }
+
+  void _changeLanguage(AppLanguage language) {
+    _languageChanged = true;
+    setState(() => _language = language);
+    unawaited(_settings.saveAppLanguage(language));
   }
 
   void _queueFile(String path) {
@@ -46,9 +72,14 @@ class _SheetMusicRookieAppState extends State<SheetMusicRookieApp> {
       if (!mounted) return;
       _showImportedComposition(imported);
     } on Object {
-      _messengerKey.currentState?.showSnackBar(
-        const SnackBar(content: Text('This score file could not be opened.')),
-      );
+      final messageContext = _messengerKey.currentContext;
+      if (messageContext != null && messageContext.mounted) {
+        _messengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Text(messageContext.l10n.thisScoreFileCouldNotBeOpened),
+          ),
+        );
+      }
     } finally {
       _openingFile = false;
       if (_pendingFiles.isNotEmpty) unawaited(_openNextFile());
@@ -80,13 +111,25 @@ class _SheetMusicRookieAppState extends State<SheetMusicRookieApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      scaffoldMessengerKey: _messengerKey,
-      title: 'Sheet Music Rookie',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      home: const HomeScreen(),
+    return LanguageScope(
+      language: _language,
+      onChanged: _changeLanguage,
+      child: MaterialApp(
+        locale: _language == AppLanguage.system ? null : Locale(_language.code),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        navigatorKey: _navigatorKey,
+        scaffoldMessengerKey: _messengerKey,
+        title: 'Sheet Music Rookie',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: const HomeScreen(),
+      ),
     );
   }
 

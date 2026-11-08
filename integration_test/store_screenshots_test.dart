@@ -85,7 +85,7 @@ void main() {
     await capture('03_octave_range');
     await tester.tap(find.text('Standard'));
     await tester.pumpAndSettle();
-    expect(find.byTooltip('Insert Note'), findsOneWidget);
+    expect(find.byTooltip('Insert Note'), findsNothing);
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sheets'));
@@ -100,10 +100,10 @@ void main() {
     await capture('05_tempo_controls');
     await tester.tap(find.text('Cancel').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Insert Note'));
-    await capture('06_insert_note');
+    await tester.ensureVisible(find.byTooltip('Toggle left repeat'));
+    await capture('06_note_editing');
     // Shut down through the navigator to release audio/ticker resources.
-    await tester.tapAt(const Offset(5, 100));
+    await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
   });
 }

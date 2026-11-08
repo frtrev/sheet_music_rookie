@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+import '../widgets/language_selector.dart';
 import '../models/playback_instrument.dart';
 import '../audio/general_user_soundfont.dart';
 
@@ -331,25 +333,31 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           context: context,
           builder: (context) => AlertDialog(
             title: Text(
-              _importPending ? 'Save imported score?' : 'Unsaved changes',
+              _importPending
+                  ? context.l10n.saveImportedScore
+                  : context.l10n.unsavedChanges,
             ),
             content: Text(
               _importPending
-                  ? 'This imported score has not been saved to your library. Save it before leaving?'
-                  : 'Your score has unsaved changes. Save them before leaving?',
+                  ? context
+                        .l10n
+                        .thisImportedScoreHasNotBeenSavedToYourLibrarySaveItBeforeLeaving
+                  : context
+                        .l10n
+                        .yourScoreHasUnsavedChangesSaveThemBeforeLeaving,
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, 'stay'),
-                child: const Text('Keep editing'),
+                child: Text(context.l10n.keepEditing),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, 'discard'),
-                child: const Text('Discard'),
+                child: Text(context.l10n.discard),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, 'save'),
-                child: const Text('Save & leave'),
+                child: Text(context.l10n.saveLeave),
               ),
             ],
           ),
@@ -378,18 +386,18 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Clear the sheet?'),
-          content: const Text(
-            'All transcribed notes in this composition will be removed.',
+          title: Text(context.l10n.clearTheSheet),
+          content: Text(
+            context.l10n.allTranscribedNotesInThisCompositionWillBeRemoved,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Clear'),
+              child: Text(context.l10n.clear),
             ),
           ],
         ),
@@ -416,14 +424,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       final titleRoute = DialogRoute<String>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Save composition'),
+          title: Text(context.l10n.saveComposition),
           content: TextField(
             controller: controller,
             autofocus: true,
             textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Title',
-              hintText: 'My composition',
+            decoration: InputDecoration(
+              labelText: context.l10n.title,
+              hintText: context.l10n.myComposition,
             ),
             onSubmitted: (value) {
               final trimmed = value.trim();
@@ -433,14 +441,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () {
                 final trimmed = controller.text.trim();
                 if (trimmed.isNotEmpty) Navigator.pop(context, trimmed);
               },
-              child: const Text('Save'),
+              child: Text(context.l10n.save),
             ),
           ],
         ),
@@ -472,15 +480,13 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _importPending = false;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Saved “$title” locally as compressed MusicXML.'),
-          ),
+          SnackBar(content: Text(context.l10n.savedLocally(title))),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The composition could not be saved.')),
+          SnackBar(content: Text(context.l10n.theCompositionCouldNotBeSaved)),
         );
       }
     } finally {
@@ -503,8 +509,8 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     );
     if (!hasNotes) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sing a few notes before playing the score.'),
+        SnackBar(
+          content: Text(context.l10n.singAFewNotesBeforePlayingTheScore),
         ),
       );
       return;
@@ -570,7 +576,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (!session.hasTargets) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Add some notes before practicing.')),
+          SnackBar(content: Text(context.l10n.addSomeNotesBeforePracticing)),
         );
       }
       return;
@@ -608,7 +614,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     _pausedByUser = true;
     if (completed && mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Practice complete!')));
+          .showSnackBar(SnackBar(content: Text(context.l10n.practiceComplete)));
     }
   }
 
@@ -632,9 +638,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     if (!session.hasNotes) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Add some notes before starting a test.'),
-          ),
+          SnackBar(content: Text(context.l10n.addSomeNotesBeforeStartingATest)),
         );
       }
       return;
@@ -700,7 +704,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               : Icons.insights_rounded,
           size: 38,
         ),
-        title: const Text('Melody test result'),
+        title: Text(context.l10n.melodyTestResult),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -711,13 +715,19 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 color: Theme.of(dialogContext).colorScheme.primary,
               ),
             ),
-            const Text('out of 100'),
+            Text(context.l10n.outOf100),
             const SizedBox(height: 18),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _TestScoreDetail(label: 'Pitch', score: result.pitchScore),
-                _TestScoreDetail(label: 'Timing', score: result.timingScore),
+                _TestScoreDetail(
+                  label: context.l10n.pitch,
+                  score: result.pitchScore,
+                ),
+                _TestScoreDetail(
+                  label: context.l10n.timing,
+                  score: result.timingScore,
+                ),
               ],
             ),
           ],
@@ -728,11 +738,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 ? null
                 : () => unawaited(_notePreview.playWave(result.matchupWave!)),
             icon: const Icon(Icons.headphones_rounded),
-            label: const Text('Listen to match'),
+            label: Text(context.l10n.listenToMatch),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
+            child: Text(context.l10n.close),
           ),
         ],
       ),
@@ -743,9 +753,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
   bool _resolvePhraseFirst() {
     if (_engine.phraseDraft.value == null) return false;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
+      SnackBar(
         content: Text(
-          'Accept or discard the recording phrase below the score first.',
+          context.l10n.acceptOrDiscardTheRecordingPhraseBelowTheScoreFirst,
         ),
       ),
     );
@@ -834,136 +844,6 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     await _syncMetronome();
   }
 
-  Future<void> _showNoteMenu() async {
-    if (_resolvePhraseFirst()) return;
-    if (_testActive) await _stopTest(showResults: false);
-    if (_practiceActive) await _stopPractice();
-    await _notePreview.stop(resetPosition: true);
-    await _stopPlayback(resumeListening: false);
-    final status = _engine.microphoneStatus.value;
-    if (status != MicrophoneStatus.paused &&
-        status != MicrophoneStatus.unavailable) {
-      _pausedByUser = true;
-      await _pauseRecording();
-    }
-    if (!mounted) return;
-
-    const pitchNames = [
-      'C',
-      'C♯',
-      'D',
-      'D♯',
-      'E',
-      'F',
-      'F♯',
-      'G',
-      'G♯',
-      'A',
-      'A♯',
-      'B',
-    ];
-    var pitchClass = 0;
-    var octave = 4;
-    var noteValue = NoteValue.quarter;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => SafeArea(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              20,
-              20,
-              20,
-              20 + MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Insert note at cursor',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        initialValue: pitchClass,
-                        decoration: const InputDecoration(labelText: 'Pitch'),
-                        items: [
-                          for (
-                            var index = 0;
-                            index < pitchNames.length;
-                            index++
-                          )
-                            DropdownMenuItem(
-                              value: index,
-                              child: Text(pitchNames[index]),
-                            ),
-                        ],
-                        onChanged: (value) => setSheetState(
-                          () => pitchClass = value ?? pitchClass,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        initialValue: octave,
-                        decoration: const InputDecoration(labelText: 'Octave'),
-                        items: [
-                          for (var value = 1; value <= 7; value++)
-                            DropdownMenuItem(
-                              value: value,
-                              child: Text('$value'),
-                            ),
-                        ],
-                        onChanged: (value) =>
-                            setSheetState(() => octave = value ?? octave),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<NoteValue>(
-                  initialValue: noteValue,
-                  decoration: const InputDecoration(labelText: 'Duration'),
-                  items: [
-                    for (final value in NoteValue.values)
-                      DropdownMenuItem(value: value, child: Text(value.label)),
-                  ],
-                  onChanged: (value) =>
-                      setSheetState(() => noteValue = value ?? noteValue),
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () {
-                    final midi = (octave + 1) * 12 + pitchClass;
-                    _engine.insertManualNote(
-                      _engine.notationCursorTick.value,
-                      midi,
-                      noteValue,
-                    );
-                    final position = ScoreLayout.durationAt(
-                      _engine.notationCursorTick.value,
-                      _engine.composition.value.tempoBpm,
-                    );
-                    unawaited(_playback.seek(position));
-                    Navigator.pop(context);
-                  },
-                  icon: const Icon(Icons.add),
-                  label: const Text('Insert note'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _prepareScoreSoundChange() async {
     if (_testActive) await _stopTest(showResults: false);
     if (_practiceActive) await _stopPractice();
@@ -984,21 +864,21 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     final tempoRoute = DialogRoute<int>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Tempo'),
+        title: Text(context.l10n.tempo),
         content: Form(
           key: formKey,
           child: TextFormField(
             controller: controller,
             autofocus: true,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Beats per minute',
-              helperText: '20–400 BPM',
+            decoration: InputDecoration(
+              labelText: context.l10n.beatsPerMinute,
+              helperText: context.l10n.message20400Bpm,
             ),
             validator: (value) {
               final n = int.tryParse(value?.trim() ?? '');
               return n == null || n < 20 || n > 400
-                  ? 'Enter a whole number from 20 to 400.'
+                  ? context.l10n.enterAWholeNumberFrom20To400
                   : null;
             },
             onFieldSubmitted: (_) {
@@ -1011,7 +891,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
@@ -1019,7 +899,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 Navigator.pop(context, int.parse(controller.text.trim()));
               }
             },
-            child: const Text('Apply'),
+            child: Text(context.l10n.apply),
           ),
         ],
       ),
@@ -1041,17 +921,17 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
     final value = await showDialog<PlaybackInstrument>(
       context: context,
       builder: (context) => SimpleDialog(
-        title: const Text('Playback instrument'),
+        title: Text(context.l10n.playbackInstrument),
         children: [
-          const Padding(
+          Padding(
             padding: EdgeInsets.fromLTRB(24, 0, 24, 12),
-            child: Text('GeneralUser GS · sampled instruments · offline'),
+            child: Text(context.l10n.generaluserGsSampledInstrumentsOffline),
           ),
           for (final family in ['Keyboards', 'Strings', 'Winds']) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 4),
               child: Text(
-                family,
+                context.l10n.label(family),
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
@@ -1062,7 +942,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 onPressed: () => Navigator.pop(context, instrument),
                 child: Row(
                   children: [
-                    Expanded(child: Text(instrument.label)),
+                    Expanded(child: Text(context.l10n.label(instrument.label))),
                     if (instrument ==
                         _engine.composition.value.playbackInstrument)
                       const Icon(Icons.check),
@@ -1078,7 +958,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 applicationName: 'Sheet Music Rookie',
               );
             },
-            child: const Text('Sound library licenses'),
+            child: Text(context.l10n.soundLibraryLicenses),
           ),
         ],
       ),
@@ -1102,7 +982,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Choose a major key'),
+          title: Text(context.l10n.chooseAMajorKey),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
@@ -1115,7 +995,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                     ),
-                    title: Text(keySignature.label),
+                    title: Text(context.l10n.keyLabel(keySignature)),
                     dense: true,
                     selected: keySignature == selected,
                     onTap: () => setDialogState(() => selected = keySignature),
@@ -1126,11 +1006,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, selected),
-              child: const Text('OK'),
+              child: Text(context.l10n.ok),
             ),
           ],
         ),
@@ -1149,7 +1029,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Choose octave range'),
+          title: Text(context.l10n.chooseOctaveRange),
           content: SizedBox(
             width: double.maxFinite,
             child: ListView(
@@ -1162,9 +1042,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                           ? Icons.radio_button_checked
                           : Icons.radio_button_unchecked,
                     ),
-                    title: Text(range.label),
+                    title: Text(context.l10n.label(range.label)),
                     subtitle: range == OctaveRange.standard
-                        ? const Text('Written and sounding pitch match')
+                        ? Text(context.l10n.writtenAndSoundingPitchMatch)
                         : Text(_octaveRangeDescription(range)),
                     dense: true,
                     selected: range == selected,
@@ -1176,11 +1056,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, selected),
-              child: const Text('OK'),
+              child: Text(context.l10n.ok),
             ),
           ],
         ),
@@ -1207,9 +1087,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
 
   String _octaveRangeDescription(OctaveRange range) {
     final octaves = range.semitones.abs() ~/ 12;
-    final direction = range.semitones < 0 ? 'lower' : 'higher';
-    return '${range.notationLabel} · written notes stay in place · '
-        'sounds $octaves octave${octaves == 1 ? '' : 's'} $direction';
+    return range.semitones < 0
+        ? context.l10n.octaveLower(range.notationLabel, octaves)
+        : context.l10n.octaveHigher(range.notationLabel, octaves);
   }
 
   Future<void> _showTimeSignatureDialog() async {
@@ -1228,13 +1108,13 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text('Measure ${measureIndex + 1} time signature'),
+          title: Text(context.l10n.measureTimeSignature(measureIndex + 1)),
           content: Row(
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: beats,
-                  decoration: const InputDecoration(labelText: 'Beats'),
+                  decoration: InputDecoration(labelText: context.l10n.beats),
                   items: [
                     for (var value = 1; value <= 32; value++)
                       DropdownMenuItem(value: value, child: Text('$value')),
@@ -1251,7 +1131,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               Expanded(
                 child: DropdownButtonFormField<int>(
                   initialValue: beatUnit,
-                  decoration: const InputDecoration(labelText: 'Note value'),
+                  decoration: InputDecoration(
+                    labelText: context.l10n.noteValue,
+                  ),
                   items: [
                     for (final value in const [1, 2, 4, 8, 16])
                       DropdownMenuItem(value: value, child: Text('$value')),
@@ -1266,11 +1148,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(context, (beats, beatUnit)),
-              child: const Text('OK'),
+              child: Text(context.l10n.ok),
             ),
           ],
         ),
@@ -1304,14 +1186,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Audio volumes'),
+          title: Text(context.l10n.audioVolumes),
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Music playback ${(playbackVolume * 100).round()}%'),
+                Text(context.l10n.musicVolume((playbackVolume * 100).round())),
                 Slider(
                   value: playbackVolume,
                   divisions: 20,
@@ -1319,7 +1201,9 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                       setDialogState(() => playbackVolume = value),
                 ),
                 const SizedBox(height: 8),
-                Text('Metronome ${(metronomeVolume * 100).round()}%'),
+                Text(
+                  context.l10n.metronomeVolume((metronomeVolume * 100).round()),
+                ),
                 Slider(
                   value: metronomeVolume,
                   divisions: 20,
@@ -1332,12 +1216,12 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(context.l10n.cancel),
             ),
             FilledButton(
               onPressed: () =>
                   Navigator.pop(context, (playbackVolume, metronomeVolume)),
-              child: const Text('OK'),
+              child: Text(context.l10n.ok),
             ),
           ],
         ),
@@ -1613,7 +1497,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
       _engine.setMetronomeMode(MetronomeMode.off);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('The metronome could not start.')),
+          SnackBar(content: Text(context.l10n.theMetronomeCouldNotStart)),
         );
       }
     }
@@ -1654,12 +1538,14 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
           leading: IconButton(
             onPressed: _leave,
             icon: const Icon(Icons.arrow_back),
-            tooltip: 'Back',
+            tooltip: context.l10n.back,
           ),
           title: ValueListenableBuilder<Composition>(
             valueListenable: _engine.composition,
-            builder: (context, composition, _) =>
-                Text(composition.title, overflow: TextOverflow.ellipsis),
+            builder: (context, composition, _) => Text(
+              context.l10n.sheetTitle(composition.title),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           actions: [
             IconButton(
@@ -1670,17 +1556,12 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save_outlined),
-              tooltip: 'Save Composition',
-            ),
-            IconButton(
-              onPressed: _showNoteMenu,
-              icon: const Icon(Icons.note_add_outlined),
-              tooltip: 'Insert Note',
+              tooltip: context.l10n.saveComposition2,
             ),
             IconButton(
               onPressed: _clear,
               icon: const Icon(Icons.delete_sweep_outlined),
-              tooltip: 'Clear Sheet',
+              tooltip: context.l10n.clearSheet,
             ),
             IconButton(
               onPressed: () {
@@ -1696,7 +1577,7 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 });
               },
               icon: const Icon(Icons.tune),
-              tooltip: 'Settings',
+              tooltip: context.l10n.settings,
             ),
           ],
         ),
@@ -1927,10 +1808,12 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
               ),
             ),
             const SizedBox(height: 6),
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 4),
               child: Text(
-                'Tap anywhere on the staff to place the cursor. Recording stays active and continues overwriting from the selected note.',
+                context
+                    .l10n
+                    .tapAnywhereOnTheStaffToPlaceTheCursorRecordingStaysActiveAndContinuesOverwritingFromTheSelectedNote,
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.black54),
               ),
@@ -1950,13 +1833,15 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                       color: Theme.of(context).colorScheme.errorContainer,
                       child: ListTile(
                         leading: const Icon(Icons.mic_off),
-                        title: const Text('Microphone unavailable'),
-                        subtitle: const Text(
-                          'Allow microphone access in system settings, then try again.',
+                        title: Text(context.l10n.microphoneUnavailable),
+                        subtitle: Text(
+                          context
+                              .l10n
+                              .allowMicrophoneAccessInSystemSettingsThenTryAgain,
                         ),
                         trailing: TextButton(
                           onPressed: _startRecordingAtCursor,
-                          child: const Text('Retry'),
+                          child: Text(context.l10n.retry),
                         ),
                       ),
                     )
@@ -1968,12 +1853,11 @@ class _ScoreEditorScreenState extends State<ScoreEditorScreen>
                 initiallyExpanded: _settingsExpanded,
                 onExpansionChanged: (value) => _settingsExpanded = value,
                 leading: const Icon(Icons.graphic_eq),
-                title: const Text('Settings'),
-                subtitle: const Text(
-                  'Recognition, practice, and test playback',
-                ),
+                title: Text(context.l10n.settings),
+                subtitle: Text(context.l10n.recognitionPracticeAndTestPlayback),
                 childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
                 children: [
+                  const LanguageSelector(),
                   ValueListenableBuilder(
                     valueListenable: _engine.settings,
                     builder: (context, value, _) => VoiceSettingsPanel(
@@ -2070,8 +1954,10 @@ class _TransportControls extends StatelessWidget {
       Expanded(
         child: _TransportButton(
           key: const ValueKey('record-transport'),
-          label: recording ? 'Stop' : 'Record',
-          semanticsLabel: recording ? 'Stop recording' : 'Start recording',
+          label: recording ? context.l10n.stop : context.l10n.record,
+          semanticsLabel: recording
+              ? context.l10n.stopRecording
+              : context.l10n.startRecording,
           icon: recording
               ? Icons.stop_rounded
               : Icons.fiber_manual_record_rounded,
@@ -2085,8 +1971,10 @@ class _TransportControls extends StatelessWidget {
       Expanded(
         child: _TransportButton(
           key: const ValueKey('play-transport'),
-          label: playing ? 'Stop' : 'Play',
-          semanticsLabel: playing ? 'Stop playback' : 'Play score',
+          label: playing ? context.l10n.stop : context.l10n.play,
+          semanticsLabel: playing
+              ? context.l10n.stopPlayback
+              : context.l10n.playScore,
           icon: playing ? Icons.stop_rounded : Icons.play_arrow_rounded,
           active: playing,
           enabled: true,
@@ -2098,8 +1986,10 @@ class _TransportControls extends StatelessWidget {
       Expanded(
         child: _TransportButton(
           key: const ValueKey('practice-transport'),
-          label: practicing ? 'Stop' : 'Practice',
-          semanticsLabel: practicing ? 'Stop practice' : 'Start practice',
+          label: practicing ? context.l10n.stop : context.l10n.practice,
+          semanticsLabel: practicing
+              ? context.l10n.stopPractice
+              : context.l10n.startPractice,
           icon: practicing ? Icons.stop_rounded : Icons.school_rounded,
           active: practicing,
           enabled: practiceEnabled,
@@ -2111,8 +2001,10 @@ class _TransportControls extends StatelessWidget {
       Expanded(
         child: _TransportButton(
           key: const ValueKey('test-transport'),
-          label: testing ? 'Stop' : 'Test',
-          semanticsLabel: testing ? 'Stop melody test' : 'Start melody test',
+          label: testing ? context.l10n.stop : context.l10n.test,
+          semanticsLabel: testing
+              ? context.l10n.stopMelodyTest
+              : context.l10n.startMelodyTest,
           icon: testing ? Icons.stop_rounded : Icons.fact_check_rounded,
           active: testing,
           enabled: testEnabled,
@@ -2216,7 +2108,13 @@ class _TransportButton extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       letterSpacing: .2,
                     ),
-                    child: Text(label),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(label, maxLines: 1),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -2295,10 +2193,10 @@ class _NoteEditControls extends StatelessWidget {
                   onPressed: canToggleRest ? onToggleNote : null,
                   icon: const Icon(Icons.music_note),
                   tooltip: hasEvent && !isRest
-                      ? 'Play selected note'
+                      ? context.l10n.playSelectedNote
                       : hasEvent
-                      ? 'Change to first-line note'
-                      : 'Add one-beat note at nearest beat',
+                      ? context.l10n.changeToFirstLineNote
+                      : context.l10n.addOneBeatNoteAtNearestBeat,
                 ),
               ),
               Expanded(
@@ -2306,30 +2204,34 @@ class _NoteEditControls extends StatelessWidget {
                   onPressed: canToggleRest ? onToggleRest : null,
                   icon: const RestSymbolIcon(size: 23),
                   tooltip: hasEvent
-                      ? 'Change to rest'
-                      : 'Add one-beat rest at nearest beat',
+                      ? context.l10n.changeToRest
+                      : context.l10n.addOneBeatRestAtNearestBeat,
                 ),
               ),
               _tool(
                 Icons.arrow_downward,
-                lyricEditing ? 'Next lyric line' : 'Down one semitone',
+                lyricEditing
+                    ? context.l10n.nextLyricLine
+                    : context.l10n.downOneSemitone,
                 hasEvent && !isRest ? onPitchDown : null,
                 keepLyricFocus: lyricEditing,
               ),
               _tool(
                 Icons.arrow_upward,
-                lyricEditing ? 'Previous lyric line' : 'Up one semitone',
+                lyricEditing
+                    ? context.l10n.previousLyricLine
+                    : context.l10n.upOneSemitone,
                 hasEvent && !isRest ? onPitchUp : null,
                 keepLyricFocus: lyricEditing,
               ),
               _tool(
                 Icons.arrow_back,
-                'Shorter note',
+                context.l10n.shorterNote,
                 hasEvent ? onShorter : null,
               ),
               _tool(
                 Icons.arrow_forward,
-                'Longer note',
+                context.l10n.longerNote,
                 hasEvent ? onLonger : null,
               ),
             ],
@@ -2339,29 +2241,39 @@ class _NoteEditControls extends StatelessWidget {
             children: [
               _tool(
                 Icons.lyrics_outlined,
-                'Edit lyrics',
+                context.l10n.editLyrics,
                 hasEvent && !isRest ? onEditLyrics : null,
               ),
               _tool(
                 noteTapPlayback ? Icons.volume_up : Icons.volume_off,
-                noteTapPlayback ? 'Mute tapped notes' : 'Play tapped notes',
+                noteTapPlayback
+                    ? context.l10n.muteTappedNotes
+                    : context.l10n.playTappedNotes,
                 onToggleNoteTapPlayback,
               ),
               _tool(
                 isTied ? Icons.link_off : Icons.link,
-                isTied ? 'Remove tie' : 'Tie to next note',
+                isTied ? context.l10n.removeTie : context.l10n.tieToNextNote,
                 canToggleTie || isTied ? onToggleTie : null,
               ),
-              _tool(Icons.undo_rounded, 'Undo', canUndo ? onUndo : null),
-              _tool(Icons.redo_rounded, 'Redo', canRedo ? onRedo : null),
+              _tool(
+                Icons.undo_rounded,
+                context.l10n.undo,
+                canUndo ? onUndo : null,
+              ),
+              _tool(
+                Icons.redo_rounded,
+                context.l10n.redo,
+                canRedo ? onRedo : null,
+              ),
               _tool(
                 Icons.add_box_outlined,
-                'Insert blank measure after current measure',
+                context.l10n.insertBlankMeasureAfterCurrentMeasure,
                 onInsertMeasure,
               ),
               _tool(
                 Icons.close_rounded,
-                'Remove selected note or rest',
+                context.l10n.removeSelectedNoteOrRest,
                 hasEvent ? onRemove : null,
                 color: Theme.of(context).colorScheme.error,
               ),
@@ -2394,8 +2306,12 @@ class _NoteEditControls extends StatelessWidget {
       child: IconButton(
         key: ValueKey('${edge.name}-${volta ? 'volta' : 'repeat'}'),
         tooltip: volta
-            ? '${edge == MeasureEdge.left ? 'Left' : 'Right'} volta: ${number ?? 'none'} (cycle 1, 2, 3, none)'
-            : 'Toggle ${edge.name} repeat',
+            ? (edge == MeasureEdge.left
+                  ? context.l10n.leftVolta(number ?? context.l10n.noVolta)
+                  : context.l10n.rightVolta(number ?? context.l10n.noVolta))
+            : (edge == MeasureEdge.left
+                  ? context.l10n.leftRepeat
+                  : context.l10n.rightRepeat),
         isSelected: active,
         onPressed: selectedMeasure == null
             ? null
@@ -2459,29 +2375,36 @@ class _CompositionHeader extends StatelessWidget {
   final ValueChanged<MetronomeMode> onMetronomeChanged;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 6,
-    children: [
-      _chip(Icons.music_note, '${composition.clef.label} clef'),
+  Widget build(BuildContext context) {
+    final labels = <Widget>[
+      _chip(
+        Icons.music_note,
+        context.l10n.clefHeader(context.l10n.label(composition.clef.label)),
+      ),
       ActionChip(
         avatar: const Icon(Icons.swap_vert, size: 16),
-        label: Text(composition.octaveRange.label),
+        label: Text(context.l10n.label(composition.octaveRange.label)),
         onPressed: onOctaveRangePressed,
         visualDensity: VisualDensity.compact,
       ),
       ActionChip(
         avatar: const Icon(Icons.key, size: 16),
-        label: Text(composition.keySignature.label),
+        label: Text(context.l10n.keyLabel(composition.keySignature)),
         onPressed: onKeySignaturePressed,
         visualDensity: VisualDensity.compact,
       ),
       ActionChip(
         avatar: const Icon(Icons.timer_outlined, size: 16),
         label: Text(
-          'Measure ${selectedMeasureIndex + 1}: '
-          '${composition.measures[selectedMeasureIndex].effectiveBeats(composition.beatsPerMeasure)}/'
-          '${composition.measures[selectedMeasureIndex].effectiveBeatUnit(composition.beatUnit)}',
+          context.l10n.measureMeter(
+            selectedMeasureIndex + 1,
+            composition.measures[selectedMeasureIndex].effectiveBeats(
+              composition.beatsPerMeasure,
+            ),
+            composition.measures[selectedMeasureIndex].effectiveBeatUnit(
+              composition.beatUnit,
+            ),
+          ),
         ),
         onPressed: onTimeSignaturePressed,
         visualDensity: VisualDensity.compact,
@@ -2494,11 +2417,11 @@ class _CompositionHeader extends StatelessWidget {
       ),
       _chip(
         Icons.grid_view,
-        '${composition.measures.length} measure${composition.measures.length == 1 ? '' : 's'}',
+        context.l10n.measureCount(composition.measures.length),
       ),
       ActionChip(
         avatar: const Icon(Icons.piano, size: 16),
-        label: Text(composition.playbackInstrument.label),
+        label: Text(context.l10n.label(composition.playbackInstrument.label)),
         onPressed: onInstrumentPressed,
         visualDensity: VisualDensity.compact,
       ),
@@ -2511,18 +2434,43 @@ class _CompositionHeader extends StatelessWidget {
               : Icons.music_note,
           size: 16,
         ),
-        label: Text(composition.metronomeMode.label),
+        label: Text(context.l10n.label(composition.metronomeMode.label)),
         onPressed: () => onMetronomeChanged(composition.metronomeMode.next),
         visualDensity: VisualDensity.compact,
       ),
       ActionChip(
         avatar: const Icon(Icons.volume_up, size: 16),
-        label: const Text('Volumes'),
+        label: Text(context.l10n.volumes),
         onPressed: onVolumesPressed,
         visualDensity: VisualDensity.compact,
       ),
-    ],
-  );
+    ];
+    return SingleChildScrollView(
+      key: const PageStorageKey('composition-label-menu'),
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var start = 0; start < labels.length; start += 3) ...[
+            if (start > 0) const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (
+                  var index = start;
+                  index < start + 3 && index < labels.length;
+                  index++
+                ) ...[
+                  if (index > start) const SizedBox(height: 6),
+                  labels[index],
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _chip(IconData icon, String label) => Chip(
     avatar: Icon(icon, size: 16),

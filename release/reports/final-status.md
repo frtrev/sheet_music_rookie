@@ -1,6 +1,8 @@
 # Final release preparation status — 6 November 2026
 
-> Subsequent source update: the app now has inline lyric editing, a remembered tapped-note speaker toggle, measure repeat/volta controls, and the Sheets manager. The binaries/screenshots and results below describe the earlier release snapshot; regenerate the release package for the updated app.
+> Identifier update: source now uses `com.neotheone.sheetmusicrookie` on iOS and Android. Existing release packages and verification reports below retain the previous identifier and must be regenerated before upload. Register/select the new identifier in the store accounts and obtain matching iOS provisioning. Changing the identifier installs a separate app; export any sheets needed from older test installations before switching.
+
+> Subsequent source update: the app now has inline lyric editing, a remembered tapped-note speaker toggle, measure repeat/volta controls, the Sheets manager, and Spanish language support. The binaries/screenshots and results below describe the earlier release snapshot; regenerate the release package for the updated app.
 
 The release package is prepared locally. **Android submission remains blocked by the missing registered upload key.** Physical audio/permission checks, owner declarations, website publication and portal submission remain manual gates. No upload, store questionnaire submission, Git commit/push or website deployment was performed.
 

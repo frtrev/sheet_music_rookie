@@ -15,7 +15,7 @@ val releaseSigningReady = listOf("storeFile", "storePassword", "keyAlias", "keyP
     .all { !releaseProperties.getProperty(it).isNullOrBlank() }
 
 android {
-    namespace = "com.sheetmusicrookie.sheet_music_rookie"
+    namespace = "com.neotheone.sheetmusicrookie"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -25,8 +25,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.sheetmusicrookie.sheet_music_rookie"
+        // Keep the application ID aligned with the iOS bundle identifier.
+        applicationId = "com.neotheone.sheetmusicrookie"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

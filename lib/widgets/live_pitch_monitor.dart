@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -33,9 +35,13 @@ class LivePitchMonitor extends StatelessWidget {
                       children: [
                         _StatusDot(status: micStatus),
                         const SizedBox(width: 8),
-                        Text(
-                          'MICROPHONE: ${_statusLabel(micStatus)}',
-                          style: Theme.of(context).textTheme.labelLarge,
+                        Expanded(
+                          child: Text(
+                            context.l10n.microphoneStatus(
+                              _statusLabel(context, micStatus),
+                            ),
+                            style: Theme.of(context).textTheme.labelLarge,
+                          ),
                         ),
                       ],
                     ),
@@ -44,15 +50,15 @@ class LivePitchMonitor extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _Metric(
-                            'Detected note',
+                            context.l10n.detectedNote,
                             result == null
                                 ? '—'
-                                : '${result.noteName}${result.octave}',
+                                : '${context.l10n.noteName(result.noteName)}${result.octave}',
                           ),
                         ),
                         Expanded(
                           child: _Metric(
-                            'Frequency',
+                            context.l10n.frequency,
                             result == null
                                 ? '—'
                                 : '${result.frequencyHz.toStringAsFixed(1)} Hz',
@@ -60,7 +66,7 @@ class LivePitchMonitor extends StatelessWidget {
                         ),
                         Expanded(
                           child: _Metric(
-                            'Confidence',
+                            context.l10n.confidence,
                             result == null
                                 ? '—'
                                 : '${(result.confidence * 100).round()}%',
@@ -73,7 +79,7 @@ class LivePitchMonitor extends StatelessWidget {
                       children: [
                         Expanded(
                           child: _Metric(
-                            'Pitch offset',
+                            context.l10n.pitchOffset,
                             result == null
                                 ? '—'
                                 : '${result.centsDeviation >= 0 ? '+' : ''}${result.centsDeviation.toStringAsFixed(1)} cents',
@@ -81,7 +87,7 @@ class LivePitchMonitor extends StatelessWidget {
                         ),
                         Expanded(
                           child: _Metric(
-                            'Amplitude',
+                            context.l10n.amplitude,
                             result == null
                                 ? '—'
                                 : '${result.dbfs.toStringAsFixed(1)} dBFS',
@@ -90,8 +96,10 @@ class LivePitchMonitor extends StatelessWidget {
                         Expanded(
                           child: ValueListenableBuilder<int>(
                             valueListenable: durationMs,
-                            builder: (context, value, child) =>
-                                _Metric('Current duration', '$value ms'),
+                            builder: (context, value, child) => _Metric(
+                              context.l10n.currentDuration,
+                              '$value ms',
+                            ),
                           ),
                         ),
                       ],
@@ -106,14 +114,15 @@ class LivePitchMonitor extends StatelessWidget {
     );
   }
 
-  String _statusLabel(MicrophoneStatus value) => switch (value) {
-    MicrophoneStatus.starting => 'STARTING',
-    MicrophoneStatus.listening => 'LISTENING',
-    MicrophoneStatus.voiceDetected => 'VOICE DETECTED',
-    MicrophoneStatus.silence => 'SILENCE',
-    MicrophoneStatus.paused => 'PAUSED',
-    MicrophoneStatus.unavailable => 'UNAVAILABLE',
-  };
+  String _statusLabel(BuildContext context, MicrophoneStatus value) =>
+      switch (value) {
+        MicrophoneStatus.starting => context.l10n.starting,
+        MicrophoneStatus.listening => context.l10n.listening,
+        MicrophoneStatus.voiceDetected => context.l10n.voiceDetected,
+        MicrophoneStatus.silence => context.l10n.silence,
+        MicrophoneStatus.paused => context.l10n.paused,
+        MicrophoneStatus.unavailable => context.l10n.unavailable,
+      };
 }
 
 class _Metric extends StatelessWidget {
@@ -167,16 +176,29 @@ class _TuningBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalized = ((cents ?? 0).clamp(-50, 50) + 50) / 100;
     final label = cents == null
-        ? 'No pitch'
-        : (cents! < -8 ? 'Flat' : (cents! > 8 ? 'Sharp' : 'In tune'));
+        ? context.l10n.noPitch
+        : (cents! < -8
+              ? context.l10n.flat
+              : (cents! > 8 ? context.l10n.sharp : context.l10n.inTune));
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('♭ Flat'),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const Text('Sharp ♯'),
+            Expanded(child: Text(context.l10n.flatIndicator)),
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                context.l10n.sharpIndicator,
+                textAlign: TextAlign.right,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),

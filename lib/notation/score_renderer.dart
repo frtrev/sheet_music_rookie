@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
@@ -128,8 +130,11 @@ class ScoreLayout {
   }
 
   static double contentStart(Composition composition, int measureIndex) {
+    final repeatSpace = repeatInset(composition, measureIndex);
     if (measureIndex == 0) {
-      return 54 + composition.keySignature.accidentalCount.abs() * 7.5;
+      return 54 +
+          composition.keySignature.accidentalCount.abs() * 7.5 +
+          repeatSpace;
     }
     final measure = composition.measures[measureIndex];
     final previous = composition.measures[measureIndex - 1];
@@ -139,8 +144,28 @@ class ScoreLayout {
         measure.effectiveBeatUnit(composition.beatUnit) !=
             previous.effectiveBeatUnit(composition.beatUnit);
     final hasLyrics = measure.notes.any((n) => n.lyrics.isNotEmpty);
-    return changed ? (hasLyrics ? 54 : 44) : (hasLyrics ? 40 : 14);
+    return (changed ? (hasLyrics ? 54 : 44) : (hasLyrics ? 40 : 14)) +
+        repeatSpace;
   }
+
+  /// Reserve the start-repeat bar and dots before the meter, key, and notes.
+  static double repeatInset(Composition composition, int measureIndex) {
+    if (measureIndex < 0 || measureIndex >= composition.measures.length) {
+      return 0;
+    }
+    return _barlines(composition.measures[measureIndex]).any(
+          (bar) => bar
+              .findElements('repeat')
+              .any((repeat) => repeat.getAttribute('direction') == 'forward'),
+        )
+        ? 24
+        : 0;
+  }
+
+  static double timeSignatureX(Composition composition, int measureIndex) =>
+      measureLeft(composition, measureIndex) +
+      (measureIndex == 0 ? 0 : 7) +
+      repeatInset(composition, measureIndex);
 
   static Offset noteCenter(
     Composition composition,
@@ -701,6 +726,7 @@ class ScoreViewState extends State<ScoreView> {
                         isComplex: true,
                         painter: ScorePainter(
                           composition,
+                          strings: context.l10n,
                           selectedEventIndex: selectedEventIndex,
                           selectedTick: selectedTick,
                           previewStartTick: previewStartTick,
@@ -916,7 +942,9 @@ class ScorePainter extends CustomPainter {
     this.playbackPosition = Duration.zero,
     this.showPlaybackCursor = false,
     this.lyricLineNumbers,
+    this.strings,
   });
+  final AppLocalizations? strings;
   final List<String>? lyricLineNumbers;
   final Composition composition;
   final int? selectedEventIndex;
@@ -983,7 +1011,7 @@ class ScorePainter extends CustomPainter {
       canvas,
       '${firstMeasure?.effectiveBeats(composition.beatsPerMeasure) ?? composition.beatsPerMeasure}\n'
       '${firstMeasure?.effectiveBeatUnit(composition.beatUnit) ?? composition.beatUnit}',
-      const Offset(72, 93),
+      Offset(ScoreLayout.timeSignatureX(composition, 0), 93),
       22,
       height: .72,
     );
@@ -996,7 +1024,8 @@ class ScorePainter extends CustomPainter {
     );
     _drawText(
       canvas,
-      composition.keySignature.name,
+      strings?.label(composition.keySignature.name) ??
+          composition.keySignature.name,
       const Offset(132, 45),
       13,
       color: const Color(0xff5e625c),
@@ -1015,7 +1044,7 @@ class ScorePainter extends CustomPainter {
           _drawText(
             canvas,
             '$beats\n$unit',
-            Offset(ScoreLayout.measureLeft(composition, measure.index) + 7, 93),
+            Offset(ScoreLayout.timeSignatureX(composition, measure.index), 93),
             19,
             height: .72,
           );
@@ -1322,7 +1351,10 @@ class ScorePainter extends CustomPainter {
       _drawText(
         canvas,
         sharps ? '♯' : '♭',
-        Offset(99 + index * 7.5, y - 14),
+        Offset(
+          99 + ScoreLayout.repeatInset(composition, 0) + index * 7.5,
+          y - 14,
+        ),
         18,
       );
     }
@@ -1406,6 +1438,7 @@ class ScorePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant ScorePainter oldDelegate) =>
+      strings?.localeName != oldDelegate.strings?.localeName ||
       !listEquals(oldDelegate.lyricLineNumbers, lyricLineNumbers) ||
       oldDelegate.composition != composition ||
       oldDelegate.selectedEventIndex != selectedEventIndex ||

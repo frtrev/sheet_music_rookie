@@ -1,0 +1,460 @@
+{
+  "@@locale": "en",
+  "singItSeeItShapeIt": "Sing it. See it. Shape it.",
+  "yourVoiceYourMusic": "Your voice. Your music.",
+  "turnAMelodyIntoSheetMusicOneNoteAtATime": "Turn a melody into sheet music, one note at a time.",
+  "create": "Create",
+  "sheets": "Sheets",
+  "settings": "Settings",
+  "offlineNoAccountRequired": "Offline • No account required",
+  "chooseAClef": "Choose a clef",
+  "savedSheetsCouldNotBeRead": "Saved sheets could not be read.",
+  "theSheetCouldNotBeShared": "The sheet could not be shared.",
+  "chooseAnOctaveRange": "Choose an octave range",
+  "detectedNotesWillBeWrittenAndPlayedInThisRange": "Detected notes will be written and played in this range.",
+  "writeTwoOctavesBelowTheDetectedPitch": "Write two octaves below the detected pitch",
+  "writeOneOctaveBelowTheDetectedPitch": "Write one octave below the detected pitch",
+  "writeAtTheDetectedPitch": "Write at the detected pitch",
+  "writeOneOctaveAboveTheDetectedPitch": "Write one octave above the detected pitch",
+  "writeTwoOctavesAboveTheDetectedPitch": "Write two octaves above the detected pitch",
+  "saveImportedScore": "Save imported score?",
+  "unsavedChanges": "Unsaved changes",
+  "thisImportedScoreHasNotBeenSavedToYourLibrarySaveItBeforeLeaving": "This imported score has not been saved to your library. Save it before leaving?",
+  "yourScoreHasUnsavedChangesSaveThemBeforeLeaving": "Your score has unsaved changes. Save them before leaving?",
+  "keepEditing": "Keep editing",
+  "discard": "Discard",
+  "saveLeave": "Save & leave",
+  "clearTheSheet": "Clear the sheet?",
+  "allTranscribedNotesInThisCompositionWillBeRemoved": "All transcribed notes in this composition will be removed.",
+  "cancel": "Cancel",
+  "clear": "Clear",
+  "saveComposition": "Save composition",
+  "title": "Title",
+  "myComposition": "My composition",
+  "save": "Save",
+  "theCompositionCouldNotBeSaved": "The composition could not be saved.",
+  "singAFewNotesBeforePlayingTheScore": "Sing a few notes before playing the score.",
+  "addSomeNotesBeforePracticing": "Add some notes before practicing.",
+  "practiceComplete": "Practice complete!",
+  "addSomeNotesBeforeStartingATest": "Add some notes before starting a test.",
+  "melodyTestResult": "Melody test result",
+  "outOf100": "out of 100",
+  "pitch": "Pitch",
+  "timing": "Timing",
+  "listenToMatch": "Listen to match",
+  "close": "Close",
+  "acceptOrDiscardTheRecordingPhraseBelowTheScoreFirst": "Accept or discard the recording phrase below the score first.",
+  "tempo": "Tempo",
+  "beatsPerMinute": "Beats per minute",
+  "message20400Bpm": "20–400 BPM",
+  "enterAWholeNumberFrom20To400": "Enter a whole number from 20 to 400.",
+  "apply": "Apply",
+  "playbackInstrument": "Playback instrument",
+  "generaluserGsSampledInstrumentsOffline": "GeneralUser GS · sampled instruments · offline",
+  "soundLibraryLicenses": "Sound library licenses",
+  "chooseAMajorKey": "Choose a major key",
+  "ok": "OK",
+  "chooseOctaveRange": "Choose octave range",
+  "writtenAndSoundingPitchMatch": "Written and sounding pitch match",
+  "beats": "Beats",
+  "noteValue": "Note value",
+  "audioVolumes": "Audio volumes",
+  "theMetronomeCouldNotStart": "The metronome could not start.",
+  "back": "Back",
+  "saveComposition2": "Save Composition",
+  "clearSheet": "Clear Sheet",
+  "tapAnywhereOnTheStaffToPlaceTheCursorRecordingStaysActiveAndContinuesOverwritingFromTheSelectedNote": "Tap anywhere on the staff to place the cursor. Recording stays active and continues overwriting from the selected note.",
+  "microphoneUnavailable": "Microphone unavailable",
+  "allowMicrophoneAccessInSystemSettingsThenTryAgain": "Allow microphone access in system settings, then try again.",
+  "retry": "Retry",
+  "recognitionPracticeAndTestPlayback": "Recognition, practice, and test playback",
+  "stop": "Stop",
+  "record": "Record",
+  "stopRecording": "Stop recording",
+  "startRecording": "Start recording",
+  "play": "Play",
+  "stopPlayback": "Stop playback",
+  "playScore": "Play score",
+  "practice": "Practice",
+  "stopPractice": "Stop practice",
+  "startPractice": "Start practice",
+  "test": "Test",
+  "stopMelodyTest": "Stop melody test",
+  "startMelodyTest": "Start melody test",
+  "playSelectedNote": "Play selected note",
+  "changeToFirstLineNote": "Change to first-line note",
+  "addOneBeatNoteAtNearestBeat": "Add one-beat note at nearest beat",
+  "changeToRest": "Change to rest",
+  "addOneBeatRestAtNearestBeat": "Add one-beat rest at nearest beat",
+  "nextLyricLine": "Next lyric line",
+  "downOneSemitone": "Down one semitone",
+  "previousLyricLine": "Previous lyric line",
+  "upOneSemitone": "Up one semitone",
+  "shorterNote": "Shorter note",
+  "longerNote": "Longer note",
+  "editLyrics": "Edit lyrics",
+  "muteTappedNotes": "Mute tapped notes",
+  "playTappedNotes": "Play tapped notes",
+  "removeTie": "Remove tie",
+  "tieToNextNote": "Tie to next note",
+  "undo": "Undo",
+  "redo": "Redo",
+  "insertBlankMeasureAfterCurrentMeasure": "Insert blank measure after current measure",
+  "removeSelectedNoteOrRest": "Remove selected note or rest",
+  "volumes": "Volumes",
+  "soundPractice": "Sound & practice",
+  "personalizeVoicePolishPracticeAndRecognitionEverythingRunsOffline": "Personalize voice polish, practice, and recognition. Everything runs offline.",
+  "practiceDifficulty": "Practice difficulty",
+  "pitchStability": "Pitch stability",
+  "pitchToleranceCapturePractice": "Pitch tolerance (capture & practice)",
+  "recordingAnalysis": "Recording analysis",
+  "live": "Live",
+  "reviewAfterAPhrase": "Review after a phrase",
+  "phraseModeWaitsForSilenceThenShowsAPitchTraceAndPreviewNotesOnlyAcceptedPhrasesAreWrittenToTheScorePlayOrSingOneNoteAtATime": "Phrase mode waits for silence, then shows a pitch trace and preview notes. Only accepted phrases are written to the score. Play or sing one note at a time.",
+  "phraseSilence": "Phrase silence",
+  "automaticCursorPosition": "Automatic cursor position",
+  "voicePolishTestPlayback": "Voice polish (test playback)",
+  "off": "Off",
+  "aClearerSmootherVoiceWithSubtleRoomAmbienceAppliesToYourNextTestPlaybackPitchAndScoringStayUnchanged": "A clearer, smoother voice with subtle room ambience. Applies to your next test playback; pitch and scoring stay unchanged.",
+  "minimumFrequency": "Minimum frequency",
+  "maximumFrequency": "Maximum frequency",
+  "minimumConfidence": "Minimum confidence",
+  "minimumNoteDuration": "Minimum note duration",
+  "silenceThreshold": "Silence threshold",
+  "silenceDuration": "Silence duration",
+  "repeatedSyllableGap": "Repeated-syllable gap",
+  "smoothingWindow": "Smoothing window",
+  "resetToDefaults": "Reset to Defaults",
+  "playbackCouldNotBeStopped": "Playback could not be stopped.",
+  "thisSheetHasNoPlayableNotes": "This sheet has no playable notes.",
+  "theSheetCouldNotBePlayed": "The sheet could not be played.",
+  "removeSheet": "Remove {title}",
+  "remove": "Remove",
+  "theSheetCouldNotBeRemoved": "The sheet could not be removed.",
+  "noSavedSheetsYet": "No saved sheets yet.",
+  "finishLyricEditing": "Finish lyric editing",
+  "detectedNote": "Detected note",
+  "frequency": "Frequency",
+  "confidence": "Confidence",
+  "pitchOffset": "Pitch offset",
+  "amplitude": "Amplitude",
+  "currentDuration": "Current duration",
+  "starting": "STARTING",
+  "listening": "LISTENING",
+  "voiceDetected": "VOICE DETECTED",
+  "silence": "SILENCE",
+  "paused": "PAUSED",
+  "unavailable": "UNAVAILABLE",
+  "pitchGaugeInactive": "Pitch gauge inactive",
+  "pitchGaugeWaitingForATone": "Pitch gauge waiting for a tone",
+  "listeningToYourPhrase": "Listening to your phrase…",
+  "analyzingYourPhrase": "Analyzing your phrase…",
+  "writeThisPhraseToTheScore": "Write this phrase to the score?",
+  "noClearNotesFound": "No clear notes found.",
+  "noClearNotesFoundTryAgainOrAdjustTheDetectionSettings": "No clear notes found. Try again or adjust the detection settings.",
+  "couldNotAnalyzeThisPhraseDiscardItAndTryAgain": "Could not analyze this phrase. Discard it and try again.",
+  "pauseToReviewOrTapReviewNowUpTo30SecondsPerPhrase": "Pause to review, or tap Review now. Up to 30 seconds per phrase.",
+  "greyNotesAreAPreviewRecordingWaitsForYourChoice": "Grey notes are a preview. Recording waits for your choice.",
+  "no": "No",
+  "yes": "Yes",
+  "reviewNow": "Review now",
+  "thisScoreFileCouldNotBeOpened": "This score file could not be opened.",
+  "untitledComposition": "Untitled Composition",
+  "treble": "Treble",
+  "bass": "Bass",
+  "alto": "Alto",
+  "tenor": "Tenor",
+  "message15Down": "15 down",
+  "message8Down": "8 down",
+  "standard": "Standard",
+  "message8Up": "8 up",
+  "message15Up": "15 up",
+  "metronomeOff": "Metronome off",
+  "metronomeOn": "Metronome on",
+  "metronomeSingle": "Metronome single",
+  "beginner": "Beginner",
+  "medium": "Medium",
+  "advanced": "Advanced",
+  "keepsEarnedProgressWhenThePitchIsMissed": "Keeps earned progress when the pitch is missed.",
+  "resetsProgressForTheCurrentNote": "Resets progress for the current note.",
+  "returnsToTheBeginningOfTheScore": "Returns to the beginning of the score.",
+  "keyboards": "Keyboards",
+  "strings": "Strings",
+  "winds": "Winds",
+  "piano": "Piano",
+  "brightPiano": "Bright piano",
+  "electricPiano": "Electric piano",
+  "harpsichord": "Harpsichord",
+  "drawbarOrgan": "Drawbar organ",
+  "churchOrgan": "Church organ",
+  "reedOrgan": "Reed organ",
+  "accordion": "Accordion",
+  "harmonica": "Harmonica",
+  "nylonGuitar": "Nylon guitar",
+  "steelStringGuitar": "Steel-string guitar",
+  "acousticBass": "Acoustic bass",
+  "violin": "Violin",
+  "viola": "Viola",
+  "cello": "Cello",
+  "contrabass": "Contrabass",
+  "pizzicatoStrings": "Pizzicato strings",
+  "harp": "Harp",
+  "stringEnsemble": "String ensemble",
+  "trumpet": "Trumpet",
+  "trombone": "Trombone",
+  "tuba": "Tuba",
+  "frenchHorn": "French horn",
+  "sopranoSaxophone": "Soprano saxophone",
+  "altoSaxophone": "Alto saxophone",
+  "tenorSaxophone": "Tenor saxophone",
+  "baritoneSaxophone": "Baritone saxophone",
+  "oboe": "Oboe",
+  "englishHorn": "English horn",
+  "bassoon": "Bassoon",
+  "clarinet": "Clarinet",
+  "piccolo": "Piccolo",
+  "flute": "Flute",
+  "recorder": "Recorder",
+  "panFlute": "Pan flute",
+  "shakuhachi": "Shakuhachi",
+  "ocarina": "Ocarina",
+  "cMajor": "C Major",
+  "gMajor": "G Major",
+  "dMajor": "D Major",
+  "aMajor": "A Major",
+  "eMajor": "E Major",
+  "bMajor": "B Major",
+  "fMajor": "F♯ Major",
+  "cMajor2": "C♯ Major",
+  "fMajor2": "F Major",
+  "bMajor2": "B♭ Major",
+  "eMajor2": "E♭ Major",
+  "aMajor2": "A♭ Major",
+  "dMajor2": "D♭ Major",
+  "gMajor2": "G♭ Major",
+  "cMajor3": "C♭ Major",
+  "savedLocally": "Saved “{title}” locally as compressed MusicXML.",
+  "@savedLocally": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "removeSheetNamed": "Remove “{title}” from your saved sheets?",
+  "@removeSheetNamed": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "playSheet": "Play {title}",
+  "@playSheet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "stopSheet": "Stop {title}",
+  "@stopSheet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "shareSheet": "Share {title}",
+  "@shareSheet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@removeSheet": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricLine": "Line {line}",
+  "@lyricLine": {
+    "placeholders": {
+      "line": {
+        "type": "String"
+      }
+    }
+  },
+  "clefName": "{clef} Clef",
+  "@clefName": {
+    "placeholders": {
+      "clef": {
+        "type": "String"
+      }
+    }
+  },
+  "clefHeader": "{clef} clef",
+  "@clefHeader": {
+    "placeholders": {
+      "clef": {
+        "type": "String"
+      }
+    }
+  },
+  "measureTimeSignature": "Measure {number} time signature",
+  "@measureTimeSignature": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "measureMeter": "Measure {number}: {beats}/{unit}",
+  "@measureMeter": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      },
+      "beats": {
+        "type": "int"
+      },
+      "unit": {
+        "type": "int"
+      }
+    }
+  },
+  "measureCount": "{count, plural, one{{count} measure} other{{count} measures}}",
+  "@measureCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "musicVolume": "Music playback {percent}%",
+  "@musicVolume": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "metronomeVolume": "Metronome {percent}%",
+  "@metronomeVolume": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "cursorFromLeft": "{percent}% from left",
+  "@cursorFromLeft": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "toleranceCents": "±{cents} cents",
+  "@toleranceCents": {
+    "placeholders": {
+      "cents": {
+        "type": "int"
+      }
+    }
+  },
+  "microphoneStatus": "MICROPHONE: {status}",
+  "@microphoneStatus": {
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "pitchGaugeReading": "Pitch {description}; acceptable within plus or minus {cents} cents",
+  "@pitchGaugeReading": {
+    "placeholders": {
+      "description": {
+        "type": "String"
+      },
+      "cents": {
+        "type": "int"
+      }
+    }
+  },
+  "sharpCents": "{cents} cents sharp",
+  "@sharpCents": {
+    "placeholders": {
+      "cents": {
+        "type": "int"
+      }
+    }
+  },
+  "flatCents": "{cents} cents flat",
+  "@flatCents": {
+    "placeholders": {
+      "cents": {
+        "type": "int"
+      }
+    }
+  },
+  "onPitch": "on pitch",
+  "leftVolta": "Left volta: {number} (cycle 1, 2, 3, none)",
+  "@leftVolta": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "leftRepeat": "Toggle left repeat",
+  "rightVolta": "Right volta: {number} (cycle 1, 2, 3, none)",
+  "@rightVolta": {
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "rightRepeat": "Toggle right repeat",
+  "noVolta": "none",
+  "octaveLower": "{notation} · written notes stay in place · sounds {count, plural, one{{count} octave} other{{count} octaves}} lower",
+  "@octaveLower": {
+    "placeholders": {
+      "notation": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "octaveHigher": "{notation} · written notes stay in place · sounds {count, plural, one{{count} octave} other{{count} octaves}} higher",
+  "@octaveHigher": {
+    "placeholders": {
+      "notation": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "language": "Language",
+  "deviceLanguage": "Device language",
+  "english": "English",
+  "spanish": "Español",
+  "languageHelp": "Follow your phone’s language or choose a language for this app.",
+  "welcomeSpanish": "Partituras para Novatos",
+  "removeSheetQuestion": "Remove sheet?",
+  "frames": "frames",
+  "noPitch": "No pitch",
+  "flat": "Flat",
+  "sharp": "Sharp",
+  "inTune": "In tune",
+  "flatIndicator": "♭ Flat",
+  "sharpIndicator": "Sharp ♯"
+}

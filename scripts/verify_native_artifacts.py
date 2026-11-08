@@ -9,7 +9,7 @@ for file in files:
     tree=ET.parse(file);r=tree.getroot();sdk=r.find('uses-sdk');app=r.find('application')
     permissions=[e.get(ns+'name') for e in r.findall('uses-permission')]
     result={'file':str(file.relative_to(root)), 'package':r.get('package'), 'permissions':permissions,'min_sdk':sdk.get(ns+'minSdkVersion') if sdk is not None else None,'target_sdk':sdk.get(ns+'targetSdkVersion') if sdk is not None else None,'debuggable':app.get(ns+'debuggable','false') if app is not None else None}
-    result['unexpected_permissions']=[p for p in permissions if p not in ['android.permission.RECORD_AUDIO','android.permission.WAKE_LOCK','android.permission.MODIFY_AUDIO_SETTINGS','com.sheetmusicrookie.sheet_music_rookie.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION']]
+    result['unexpected_permissions']=[p for p in permissions if p not in ['android.permission.RECORD_AUDIO','android.permission.WAKE_LOCK','android.permission.MODIFY_AUDIO_SETTINGS','com.neotheone.sheetmusicrookie.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION']]
     report['android']['release_manifests'].append(result)
 report['ios']={'archives':[]}
 for archive in [root/'build/ios/archive/Runner.xcarchive',root/'release/ios/unsigned-verification.xcarchive']:

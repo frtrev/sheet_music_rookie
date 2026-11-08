@@ -1,3 +1,5 @@
+import '../l10n/l10n.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -62,7 +64,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
     try {
       await _playback.stop(resetPosition: true);
     } catch (_) {
-      _error('Playback could not be stopped.');
+      if (mounted) _error(context.l10n.playbackCouldNotBeStopped);
     }
   }
 
@@ -78,12 +80,12 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
       if (!mounted || request != _request) return;
       if (!played) {
         setState(() => _activePath = null);
-        _error('This sheet has no playable notes.');
+        _error(context.l10n.thisSheetHasNoPlayableNotes);
       }
     } catch (_) {
       if (!mounted || request != _request) return;
       setState(() => _activePath = null);
-      _error('The sheet could not be played.');
+      _error(context.l10n.theSheetCouldNotBePlayed);
     }
   }
 
@@ -98,18 +100,20 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove sheet?'),
+        title: Text(context.l10n.removeSheetQuestion),
         content: Text(
-          'Remove “${item.composition.title}” from your saved sheets?',
+          context.l10n.removeSheetNamed(
+            context.l10n.sheetTitle(item.composition.title),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
+            child: Text(context.l10n.cancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Remove'),
+            child: Text(context.l10n.remove),
           ),
         ],
       ),
@@ -123,7 +127,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
         setState(() => _sheets.removeWhere((sheet) => sheet.path == item.path));
       }
     } catch (_) {
-      _error('The sheet could not be removed.');
+      if (mounted) _error(context.l10n.theSheetCouldNotBeRemoved);
     } finally {
       if (mounted) setState(() => _removing.remove(item.path));
     }
@@ -146,7 +150,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
     },
     child: AlertDialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      title: const Text('Sheets'),
+      title: Text(context.l10n.sheets),
       contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       content: SizedBox(
         width: 560,
@@ -155,9 +159,9 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
             maxHeight: MediaQuery.sizeOf(context).height * .65,
           ),
           child: _sheets.isEmpty
-              ? const Padding(
+              ? Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('No saved sheets yet.'),
+                  child: Text(context.l10n.noSavedSheetsYet),
                 )
               : ListView.separated(
                   shrinkWrap: true,
@@ -170,19 +174,18 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
       actions: [
         TextButton(
           onPressed: () => unawaited(_close()),
-          child: const Text('Cancel'),
+          child: Text(context.l10n.cancel),
         ),
       ],
     ),
   );
 
   Widget _sheetRow(SavedComposition item) {
-    final title = item.composition.title;
+    final title = context.l10n.sheetTitle(item.composition.title);
     final date = item.modifiedAt.toLocal();
+    final material = MaterialLocalizations.of(context);
     final dateLabel =
-        '${date.month}/${date.day}/${date.year} '
-        '${date.hour.toString().padLeft(2, '0')}:'
-        '${date.minute.toString().padLeft(2, '0')}';
+        '${material.formatCompactDate(date)} ${material.formatTimeOfDay(TimeOfDay.fromDateTime(date), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context))}';
     final enabled = !_closing && !_removing.contains(item.path);
     final active = _activePath == item.path;
     return InkWell(
@@ -205,7 +208,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   Text(
-                    '${item.composition.keySignature.name} • $dateLabel',
+                    '${context.l10n.label(item.composition.keySignature.name)} • $dateLabel',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -213,7 +216,9 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
             ),
             _action(
               icon: active ? Icons.stop_rounded : Icons.play_arrow_rounded,
-              tooltip: '${active ? 'Stop' : 'Play'} $title',
+              tooltip: active
+                  ? context.l10n.stopSheet(title)
+                  : context.l10n.playSheet(title),
               onPressed: enabled
                   ? () => unawaited(_togglePlayback(item))
                   : null,
@@ -221,7 +226,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
             Builder(
               builder: (shareContext) => _action(
                 icon: Icons.ios_share_rounded,
-                tooltip: 'Share $title',
+                tooltip: context.l10n.shareSheet(title),
                 onPressed: enabled
                     ? () => unawaited(widget.onShare(shareContext, item))
                     : null,
@@ -229,7 +234,7 @@ class _SavedSheetsDialogState extends State<SavedSheetsDialog>
             ),
             _action(
               icon: Icons.delete_outline_rounded,
-              tooltip: 'Remove $title',
+              tooltip: context.l10n.removeSheet(title),
               onPressed: enabled ? () => unawaited(_remove(item)) : null,
             ),
           ],

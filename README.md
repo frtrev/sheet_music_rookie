@@ -4,6 +4,8 @@ An offline Flutter prototype that turns a single sung melody into editable-ready
 
 Octave-clef ranges follow standard sounding-pitch direction: **8 up** writes the captured pitch one octave lower and plays it one octave above the written note; **8 down** writes it one octave higher and plays it one octave below. The same rule applies to manual notes and edit previews.
 
+The iOS bundle identifier and Android application ID are both **`com.neotheone.sheetmusicrookie`**. The iOS test target uses `com.neotheone.sheetmusicrookie.RunnerTests`. The app display name and Apple signing team are unchanged.
+
 ## Run
 
 ```sh
@@ -11,15 +13,19 @@ flutter pub get
 flutter run
 ```
 
+English and Spanish are supported. The app follows the phone’s language by default; choose **Device language**, **English**, or **Español** in Settings to override it. The choice is remembered, and the language selector is also available in the editor’s Settings panel. Spanish uses **Partitura/Partituras** for sheet music while keeping the Sheet Music Rookie app name.
+
+Translation sources are `lib/l10n/app_en.arb` and `lib/l10n/app_es.arb`. Regenerate the typed message classes with `flutter gen-l10n` after editing them.
+
 Use a physical iPhone or Android device for voice testing. Simulators can verify navigation and rendering, but their microphone input is not representative of device capture.
 
 The editor opens idle. Press **Record** to capture notation or **Practice** to rehearse; either action requests microphone permission when needed. If permission was previously denied, enable microphone access in the device's system settings and tap **Retry**.
 
-Tap anywhere on the staff to place the shared score cursor. **Play** starts there, and **Record** punches in there: newly sung notes overwrite the same timeline span until silence is detected, later notes are retained, and the cursor lands where writing stopped. Repositioning the cursor during playback seeks immediately. Use **Insert Note** to choose a pitch, octave, and regular or dotted duration and place it at the cursor.
+Tap anywhere on the staff to place the shared score cursor. **Play** starts there, and **Record** punches in there: newly sung notes overwrite the same timeline span until silence is detected, later notes are retained, and the cursor lands where writing stopped. Repositioning the cursor during playback seeks immediately. Use the note editing controls below the score to add notes and adjust their pitch and duration at the cursor.
 
 Use **Practice** to rehearse without changing the composition. Practice starts at the beginning and moves the cursor to the next note after the expected sounding pitch is stable and has been held for at least 60% of the written duration. The fixed gauge on the score's left edge moves up for sharp tones and down for flat tones, changing from red to green as the detected pitch approaches the current note. Tied fragments count as one note and rests are skipped. Record, Play, and Practice are exclusive transports: starting one stops either of the others.
 
-Saved compositions have a share action in the **Open composition** list. It exports the compressed MusicXML (`.mxl`) file through the system share sheet, including Save to Files and Google Drive when available.
+Saved compositions have a share action in the **Sheets** list. It exports the compressed MusicXML (`.mxl`) file through the system share sheet, including Save to Files and Google Drive when available.
 
 Use the save button in the editor to name and store a composition locally. Scores are saved in the app's documents directory as compressed MusicXML (`.mxl`) archives, with a standard MusicXML 4.0 score plus private round-trip metadata for the editor. The **Sheets** button on the home screen lists saved scores. Tap a title to restore its notation and editable recording events, or use its play/stop, share, and remove buttons. Only one sheet plays at a time; closing the list or opening a sheet stops preview playback. No cloud service or account is involved.
 

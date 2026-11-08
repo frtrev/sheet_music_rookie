@@ -1,9 +1,24 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/voice_detection_settings.dart';
+import '../models/app_language.dart';
 
 class SettingsService {
   static const _prefix = 'voice.';
+
+  Future<AppLanguage> loadAppLanguage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final code = prefs.getString('app.language');
+    return AppLanguage.values.firstWhere(
+      (value) => value.code == code,
+      orElse: () => AppLanguage.system,
+    );
+  }
+
+  Future<void> saveAppLanguage(AppLanguage language) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('app.language', language.code);
+  }
 
   Future<bool> loadNoteTapPlayback() async {
     final prefs = await SharedPreferences.getInstance();
